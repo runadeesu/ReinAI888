@@ -45,7 +45,7 @@ export const updateProfileSchema = z.object({
 });
 
 export const apiKeySchema = z.object({
-  provider: z.enum(["anthropic", "openai", "google"]),
+  provider: z.enum(["anthropic", "openai", "google", "nvidia"]),
   key: z.string().min(10),
   label: z.string().max(64).optional(),
 });

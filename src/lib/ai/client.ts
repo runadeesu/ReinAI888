@@ -12,6 +12,11 @@ export function getLanguageModel(provider: AiProviderId, modelId: string, apiKey
       return createOpenAI({ apiKey })(modelId);
     case "google":
       return createGoogleGenerativeAI({ apiKey })(modelId);
+    case "nvidia":
+      // NVIDIA NIM only implements the OpenAI Chat Completions API, not the
+      // newer Responses API that `openai(modelId)` defaults to — `.chat()`
+      // pins it to the compatible one.
+      return createOpenAI({ apiKey, baseURL: "https://integrate.api.nvidia.com/v1" }).chat(modelId);
     default:
       throw new Error(`Unknown AI provider: ${provider}`);
   }

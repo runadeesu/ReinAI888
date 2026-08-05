@@ -14,8 +14,9 @@ there is no mock or placeholder data.
   `DATABASE_URL` for Postgres/MySQL in production) — `prisma/schema.prisma`
 - **Auth.js v5** — credentials (bcrypt) + Google OAuth, email verification,
   password reset, TOTP 2FA, server-side session tracking/revocation — `src/auth.ts`
-- **Vercel AI SDK** (`ai`, `@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`)
-  for streaming chat across providers — `src/lib/ai`
+- **Vercel AI SDK** (`ai`, `@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`,
+  plus NVIDIA NIM via `@ai-sdk/openai`'s OpenAI-compatible mode) for streaming
+  chat across providers — `src/lib/ai`
 - **AES-256-GCM** encryption for user-supplied provider API keys and TOTP secrets
   — `src/lib/crypto/encryption.ts`
 - Tailwind CSS v4, `react-markdown` + `rehype-highlight` for code-aware chat
@@ -33,7 +34,7 @@ app) or desktop/mobile shells are added, per the project roadmap below.
   account IDs, login history, active-session list with per-session revocation,
   optional TOTP 2FA with QR enrollment
 - **AI chat**: multi-provider streaming chat (Anthropic Claude / OpenAI / Google
-  Gemini), per-conversation model switching, server-default or user-supplied
+  Gemini / NVIDIA NIM), per-conversation model switching, server-default or user-supplied
   (encrypted) API keys, auto-titled conversations
 - **Organization**: pinned/favorite/searchable conversation list, projects,
   nested folders, tags

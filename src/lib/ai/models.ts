@@ -1,4 +1,4 @@
-export type AiProviderId = "anthropic" | "openai" | "google";
+export type AiProviderId = "anthropic" | "openai" | "google" | "nvidia";
 
 export interface AiModel {
   id: string;
@@ -19,6 +19,53 @@ export interface AiProviderInfo {
 // Central model registry. Add/remove providers or models here — everything
 // downstream (chat UI selector, streaming route, cost/usage) reads from it.
 export const AI_PROVIDERS: Record<AiProviderId, AiProviderInfo> = {
+  nvidia: {
+    id: "nvidia",
+    label: "NVIDIA NIM",
+    envVar: "NVIDIA_API_KEY",
+    models: [
+      {
+        id: "meta/llama-3.3-70b-instruct",
+        label: "Llama 3.3 70B Instruct",
+        description: "NVIDIA NIM上で高速推論されるバランス型モデル。汎用チャット・コード生成に。",
+        contextWindow: 128000,
+        vision: false,
+        goodFor: ["coding", "chat", "general"],
+      },
+      {
+        id: "meta/llama-3.1-405b-instruct",
+        label: "Llama 3.1 405B Instruct",
+        description: "大規模パラメータの高精度モデル。複雑な設計・アーキテクチャ提案に。",
+        contextWindow: 128000,
+        vision: false,
+        goodFor: ["architecture", "complex-reasoning"],
+      },
+      {
+        id: "nvidia/llama-3.1-nemotron-70b-instruct",
+        label: "Nemotron 70B Instruct",
+        description: "NVIDIAが対話・指示追従性能をチューニングしたモデル。",
+        contextWindow: 128000,
+        vision: false,
+        goodFor: ["chat", "instruction-following"],
+      },
+      {
+        id: "deepseek-ai/deepseek-r1",
+        label: "DeepSeek R1",
+        description: "推論特化モデル。アルゴリズム設計やデバッグ、段階的思考が必要なタスクに強い。",
+        contextWindow: 128000,
+        vision: false,
+        goodFor: ["reasoning", "debugging"],
+      },
+      {
+        id: "mistralai/mixtral-8x22b-instruct-v0.1",
+        label: "Mixtral 8x22B Instruct",
+        description: "MoEアーキテクチャの高速・低コストモデル。",
+        contextWindow: 64000,
+        vision: false,
+        goodFor: ["speed", "simple-tasks"],
+      },
+    ],
+  },
   anthropic: {
     id: "anthropic",
     label: "Anthropic Claude",
