@@ -18,8 +18,10 @@ import {
   MessageSquare,
   Trash2,
   BookMarked,
+  X,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
+import { useSidebar } from "@/components/sidebar/sidebar-context";
 import type { ConversationSummary, FolderItem, ProjectItem } from "@/types/api";
 import { cn } from "@/lib/utils/cn";
 
@@ -28,6 +30,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const { theme, toggleTheme } = useTheme();
+  const { isOpen, close } = useSidebar();
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [folders, setFolders] = useState<FolderItem[]>([]);
@@ -99,14 +102,28 @@ export function Sidebar() {
   const others = conversations.filter((c) => !c.isPinned);
 
   return (
-    <aside className="flex h-screen w-72 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)]">
+    <>
+      {isOpen && (
+        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={close} aria-hidden="true" />
+      )}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex h-screen w-72 shrink-0 -translate-x-full flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-transform duration-200 md:static md:z-auto md:translate-x-0",
+          isOpen && "translate-x-0"
+        )}
+      >
       <div className="flex items-center justify-between px-4 py-4">
         <Link href="/chat" className="text-lg font-bold tracking-tight">
           ReinAI
         </Link>
-        <button onClick={toggleTheme} className="rounded-lg p-1.5 hover:bg-[var(--surface-hover)]" title="テーマ切替">
-          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={toggleTheme} className="rounded-lg p-1.5 hover:bg-[var(--surface-hover)]" title="テーマ切替">
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          <button onClick={close} className="rounded-lg p-1.5 hover:bg-[var(--surface-hover)] md:hidden" aria-label="メニューを閉じる">
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
       <div className="px-3">
@@ -236,7 +253,8 @@ export function Sidebar() {
           </button>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 
