@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     const statements = sql
       .split(/;\s*\n/)
       .map((s) => s.trim())
-      .filter((s) => s.length > 0 && !s.startsWith("--"));
+      .filter((s) => s.length > 0);
 
     let applied = 0;
     try {
