@@ -139,10 +139,15 @@ from your own Netlify account — no CLI token for it lives in this repo/session
      also add their own from Settings → API Keys regardless
    - Netlify Blobs needs no manual credentials — it's automatically
      available to Functions on a site once deployed there.
-4. **Deploy.** The build runs `npx prisma migrate deploy && pnpm build`
-   (from `netlify.toml`), applying any pending migrations to `DATABASE_URL`
-   before building. Subsequent pushes to the connected branch redeploy
-   automatically.
+4. **Deploy.** `netlify.toml`'s build command is currently just `pnpm build`
+   — it deliberately does *not* run `prisma migrate deploy` automatically.
+   For this deployment, the schema was applied once directly against
+   Supabase (via its SQL editor/MCP tooling) rather than through Prisma's
+   own migration runner, so `_prisma_migrations` bookkeeping wasn't
+   independently confirmed to match. Once you've verified (`npx prisma
+   migrate status` against `DATABASE_URL`) that it does, change the
+   command back to `npx prisma migrate deploy && pnpm build` so future
+   schema changes apply automatically on every push.
 
 If you'd rather I drive the deploy directly (Netlify CLI, non-interactively)
 instead of the dashboard flow above, add a `NETLIFY_AUTH_TOKEN` (and either a
