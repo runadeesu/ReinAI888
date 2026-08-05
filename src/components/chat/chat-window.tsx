@@ -46,32 +46,24 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, streamingText]);
 
-  async function handleSend(content: string, attachmentIds: string[]) {
+  async function streamAssistantReply(payload: Record<string, unknown>): Promise<string | null> {
     setError(null);
-    const optimisticMessage: MessageItem = {
-      id: `pending-${Date.now()}`,
-      role: "user",
-      content,
-      provider: null,
-      model: null,
-      createdAt: new Date().toISOString(),
-      attachments: [],
-    };
-    setMessages((prev) => [...prev, optimisticMessage]);
     setStreamingText("");
 
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId, content, attachmentIds }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok || !res.body) {
       const data = await res.json().catch(() => ({ error: "エラーが発生しました" }));
       setError(data.error ?? "エラーが発生しました");
       setStreamingText(null);
-      return;
+      return null;
     }
+
+    const userMessageId = res.headers.get("X-User-Message-Id");
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -97,9 +89,39 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
         attachments: [],
       },
     ]);
+
+    return userMessageId;
+  }
+
+  async function handleSend(content: string, attachmentIds: string[]) {
+    const optimisticId = `pending-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: optimisticId,
+        role: "user",
+        content,
+        provider: null,
+        model: null,
+        createdAt: new Date().toISOString(),
+        attachments: [],
+      },
+    ]);
+
+    const realId = await streamAssistantReply({ conversationId, content, attachmentIds });
+    if (realId) {
+      setMessages((prev) => prev.map((m) => (m.id === optimisticId ? { ...m, id: realId } : m)));
+    }
   }
 
   handleSendRef.current = handleSend;
+
+  async function handleEditMessage(messageId: string, newContent: string) {
+    const idx = messages.findIndex((m) => m.id === messageId);
+    if (idx === -1) return;
+    setMessages((prev) => [...prev.slice(0, idx), { ...prev[idx], content: newContent }]);
+    await streamAssistantReply({ conversationId, content: newContent, editMessageId: messageId });
+  }
 
   async function handleModelChange(provider: AiProviderId, model: string) {
     setConversation((prev) => (prev ? { ...prev, provider, model } : prev));
@@ -126,9 +148,19 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4">
         <div className="mx-auto max-w-3xl">
           {messages.map((m) => (
-            <MessageBubble key={m.id} role={m.role} content={m.content} attachments={m.attachments} />
+            <MessageBubble
+              key={m.id}
+              id={m.id}
+              role={m.role}
+              content={m.content}
+              attachments={m.attachments}
+              onEdit={m.role === "user" ? handleEditMessage : undefined}
+              editDisabled={streamingText !== null || m.id.startsWith("pending-")}
+            />
           ))}
-          {streamingText !== null && <MessageBubble role="assistant" content={streamingText} pending />}
+          {streamingText !== null && (
+            <MessageBubble id="streaming" role="assistant" content={streamingText} pending />
+          )}
           {error && (
             <p className="my-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-[var(--danger)]">{error}</p>
           )}

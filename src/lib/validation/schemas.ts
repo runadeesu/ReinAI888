@@ -70,4 +70,5 @@ export const sendMessageSchema = z.object({
   conversationId: z.string().min(1),
   content: z.string().min(1),
   attachmentIds: z.array(z.string()).optional(),
+  editMessageId: z.string().optional(),
 });

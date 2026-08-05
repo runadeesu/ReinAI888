@@ -8,6 +8,11 @@ import type { AiProviderId } from "@/lib/ai/models";
 import { sendMessageSchema } from "@/lib/validation/schemas";
 import { rateLimit } from "@/lib/rate-limit/limiter";
 
+// Some free-tier / large models take a while to finish generating; give the
+// underlying function more room than Next's default before the platform
+// would otherwise cut the connection.
+export const maxDuration = 300;
+
 export async function POST(request: Request) {
   const userId = await requireUserId();
   if (!userId) return new Response(JSON.stringify({ error: "認証が必要です" }), { status: 401 });
@@ -25,7 +30,7 @@ export async function POST(request: Request) {
     return new Response(JSON.stringify({ error: "入力が正しくありません" }), { status: 400 });
   }
 
-  const { conversationId, content, attachmentIds } = parsed.data;
+  const { conversationId, content, attachmentIds, editMessageId } = parsed.data;
 
   const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
   if (!conversation || conversation.userId !== userId) {
@@ -43,23 +48,48 @@ export async function POST(request: Request) {
     );
   }
 
-  const priorMessages = await prisma.message.findMany({
-    where: { conversationId },
-    orderBy: { createdAt: "asc" },
-  });
+  let priorMessages;
+  let userMessage;
+
+  if (editMessageId) {
+    const target = await prisma.message.findUnique({ where: { id: editMessageId } });
+    if (!target || target.conversationId !== conversationId || target.role !== "user") {
+      return new Response(JSON.stringify({ error: "編集対象のメッセージが見つかりません" }), { status: 404 });
+    }
+
+    priorMessages = await prisma.message.findMany({
+      where: { conversationId, createdAt: { lt: target.createdAt } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    // Editing a message invalidates everything that came after it.
+    await prisma.message.deleteMany({
+      where: { conversationId, createdAt: { gt: target.createdAt } },
+    });
+
+    userMessage = await prisma.message.update({
+      where: { id: editMessageId },
+      data: { content },
+    });
+  } else {
+    priorMessages = await prisma.message.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: "asc" },
+    });
+
+    userMessage = await prisma.message.create({
+      data: {
+        conversationId,
+        role: "user",
+        content,
+        ...(attachmentIds && attachmentIds.length > 0
+          ? { attachments: { connect: attachmentIds.map((id) => ({ id })) } }
+          : {}),
+      },
+    });
+  }
 
   const isFirstMessage = priorMessages.length === 0;
-
-  const userMessage = await prisma.message.create({
-    data: {
-      conversationId,
-      role: "user",
-      content,
-      ...(attachmentIds && attachmentIds.length > 0
-        ? { attachments: { connect: attachmentIds.map((id) => ({ id })) } }
-        : {}),
-    },
-  });
 
   let attachmentContext = "";
   if (attachmentIds && attachmentIds.length > 0) {
@@ -111,7 +141,46 @@ export async function POST(request: Request) {
     },
   });
 
-  void userMessage;
+  // Piping result.textStream manually (instead of toTextStreamResponse())
+  // lets us catch a mid-generation provider error and surface it visibly to
+  // the client — and save whatever text was produced before the failure —
+  // instead of the response silently ending with no explanation.
+  const encoder = new TextEncoder();
+  let accumulated = "";
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        for await (const chunk of result.textStream) {
+          accumulated += chunk;
+          controller.enqueue(encoder.encode(chunk));
+        }
+      } catch (err) {
+        console.error("[ReinAI chat stream aborted]", err);
+        const notice = "\n\n[エラー: 応答の生成中に問題が発生しました。もう一度お試しください]";
+        controller.enqueue(encoder.encode(notice));
+        if (accumulated.trim().length > 0) {
+          await prisma.message
+            .create({
+              data: {
+                conversationId,
+                role: "assistant",
+                content: accumulated + notice,
+                provider,
+                model: conversation.model,
+              },
+            })
+            .catch(() => {});
+        }
+      } finally {
+        controller.close();
+      }
+    },
+  });
 
-  return result.toTextStreamResponse();
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-User-Message-Id": userMessage.id,
+    },
+  });
 }
