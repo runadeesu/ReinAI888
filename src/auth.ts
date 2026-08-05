@@ -7,9 +7,22 @@ import { prisma } from "@/lib/db/prisma";
 import { verifyPassword } from "@/lib/auth/password";
 import { verifyTotpToken } from "@/lib/auth/totp";
 import { decrypt } from "@/lib/crypto/encryption";
-import { generateToken } from "@/lib/utils/ids";
+import { generateDisplayId, generateToken } from "@/lib/utils/ids";
 
 const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+
+// PrismaAdapter's default createUser has no knowledge of our custom required
+// `displayId` field (only populated by the credentials-based /api/register
+// route), so OAuth sign-ins (e.g. Google) would fail with a Prisma
+// validation error on first login. Wrap the adapter to generate one here.
+async function createUserWithDisplayId(data: Record<string, unknown>) {
+  let displayId = generateDisplayId();
+  while (await prisma.user.findUnique({ where: { displayId } })) {
+    displayId = generateDisplayId();
+  }
+  const user = await prisma.user.create({ data: { ...data, displayId } as never });
+  return user;
+}
 
 // Auth.js only forwards CredentialsSignin (and subclasses) to the client as
 // a stable `code` search param — a plain thrown Error gets swallowed into a
@@ -28,8 +41,13 @@ class InvalidTotpError extends CredentialsSignin {
   code = "INVALID_TOTP";
 }
 
+const baseAdapter = PrismaAdapter(prisma);
+
 const authConfig: NextAuthConfig = {
-  adapter: PrismaAdapter(prisma),
+  adapter: {
+    ...baseAdapter,
+    createUser: createUserWithDisplayId as unknown as typeof baseAdapter.createUser,
+  },
   // Self-hosted deployments (not Vercel) must opt in to trusting the
   // request Host header; NEXTAUTH_URL / a reverse proxy is expected to
   // enforce the real external host in front of this.
@@ -45,6 +63,10 @@ const authConfig: NextAuthConfig = {
           Google({
             clientId: process.env.GOOGLE_CLIENT_ID,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            // Google verifies email ownership itself, so it's safe to link
+            // a Google sign-in to an existing credentials account with the
+            // same address instead of blocking with OAuthAccountNotLinked.
+            allowDangerousEmailAccountLinking: true,
           }),
         ]
       : []),
