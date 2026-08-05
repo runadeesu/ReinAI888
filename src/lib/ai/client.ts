@@ -17,6 +17,8 @@ export function getLanguageModel(provider: AiProviderId, modelId: string, apiKey
       // newer Responses API that `openai(modelId)` defaults to — `.chat()`
       // pins it to the compatible one.
       return createOpenAI({ apiKey, baseURL: "https://integrate.api.nvidia.com/v1" }).chat(modelId);
+    case "openrouter":
+      return createOpenAI({ apiKey, baseURL: "https://openrouter.ai/api/v1" }).chat(modelId);
     default:
       throw new Error(`Unknown AI provider: ${provider}`);
   }

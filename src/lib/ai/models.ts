@@ -1,4 +1,4 @@
-export type AiProviderId = "anthropic" | "openai" | "google" | "nvidia";
+export type AiProviderId = "anthropic" | "openai" | "google" | "nvidia" | "openrouter";
 
 export interface AiModel {
   id: string;
@@ -19,6 +19,45 @@ export interface AiProviderInfo {
 // Central model registry. Add/remove providers or models here — everything
 // downstream (chat UI selector, streaming route, cost/usage) reads from it.
 export const AI_PROVIDERS: Record<AiProviderId, AiProviderInfo> = {
+  openrouter: {
+    id: "openrouter",
+    label: "OpenRouter (無料)",
+    envVar: "OPENROUTER_API_KEY",
+    models: [
+      {
+        id: "openai/gpt-oss-20b:free",
+        label: "GPT-OSS 20B (無料)",
+        description: "OpenAI製オープンウェイトモデル。無料枠で汎用チャット・コード生成に。",
+        contextWindow: 131072,
+        vision: false,
+        goodFor: ["coding", "chat", "general"],
+      },
+      {
+        id: "google/gemma-4-31b-it:free",
+        label: "Gemma 4 31B (無料)",
+        description: "Google製マルチモーダルモデル。無料枠で画像入力にも対応。",
+        contextWindow: 262144,
+        vision: true,
+        goodFor: ["multimodal", "chat", "general"],
+      },
+      {
+        id: "nvidia/nemotron-3-super-120b-a12b:free",
+        label: "Nemotron 3 Super 120B (無料)",
+        description: "NVIDIA製の大規模MoEモデル。無料枠で複雑な推論タスクに。",
+        contextWindow: 262144,
+        vision: false,
+        goodFor: ["reasoning", "complex-reasoning"],
+      },
+      {
+        id: "inclusionai/ling-3.0-flash:free",
+        label: "Ling 3.0 Flash (無料)",
+        description: "軽量・高速なMoEモデル。無料枠で低レイテンシな応答に。",
+        contextWindow: 262144,
+        vision: false,
+        goodFor: ["speed", "chat", "simple-tasks"],
+      },
+    ],
+  },
   nvidia: {
     id: "nvidia",
     label: "NVIDIA NIM",
