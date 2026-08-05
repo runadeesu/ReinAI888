@@ -10,8 +10,9 @@ there is no mock or placeholder data.
 ## Stack
 
 - **Next.js 15** (App Router, TypeScript) — `src/app`
-- **Prisma + SQLite** by default (swap the `provider` in `prisma/schema.prisma` and
-  `DATABASE_URL` for Postgres/MySQL in production) — `prisma/schema.prisma`
+- **Prisma + Postgres** — `prisma/schema.prisma`. Postgres (not SQLite) so this
+  deploys cleanly to serverless hosts like Netlify, whose functions don't have
+  a persistent local filesystem.
 - **Auth.js v5** — credentials (bcrypt) + Google OAuth, email verification,
   password reset, TOTP 2FA, server-side session tracking/revocation — `src/auth.ts`
 - **Vercel AI SDK** (`ai`, `@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`,
@@ -21,6 +22,8 @@ there is no mock or placeholder data.
   — `src/lib/crypto/encryption.ts`
 - Tailwind CSS v4, `react-markdown` + `rehype-highlight` for code-aware chat
   rendering, `pdf-parse`/`mammoth` for attachment text extraction
+- File storage: local disk by default, automatically switches to **Netlify
+  Blobs** when `NETLIFY=true` (set by Netlify itself) — `src/lib/files/storage.ts`
 
 The `src/lib` directory is the shared "core" (AI provider abstraction, auth,
 encryption, DB access, file parsing) — designed to be extracted into a shared
@@ -50,10 +53,15 @@ app) or desktop/mobile shells are added, per the project roadmap below.
 
 ## Getting started
 
+You need a Postgres database. Easiest local options: `docker run -e
+POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16`, a system Postgres
+install, or a free hosted instance (e.g. [Neon](https://neon.tech)) — any of
+these work, since it's just a `DATABASE_URL`.
+
 ```bash
 pnpm install
 cp .env.example .env
-# fill in AUTH_SECRET and ENCRYPTION_KEY at minimum (see below), then:
+# fill in DATABASE_URL, AUTH_SECRET and ENCRYPTION_KEY at minimum (see below), then:
 npx prisma migrate deploy
 pnpm dev
 ```
@@ -86,6 +94,49 @@ pnpm start
 `trustHost: true` is set in `src/auth.ts` for self-hosted (non-Vercel) deploys —
 put a reverse proxy in front that enforces the real external Host header, and
 set `NEXTAUTH_URL` to your public URL.
+
+## Deploying to Netlify
+
+The repo is already configured for Netlify: `netlify.toml` wires up
+`@netlify/plugin-nextjs` (Netlify's official Next.js runtime — handles SSR,
+API routes, streaming responses, and middleware as Netlify
+Functions/Edge Functions automatically), and file uploads switch to Netlify
+Blobs at runtime (see `src/lib/files/storage.ts`). This part needs to be done
+from your own Netlify account — no CLI token for it lives in this repo/session:
+
+1. **Get a Postgres database.** Easiest: in the Netlify dashboard, go to
+   **Extensions → Neon** (or **Extensions → Supabase**) and provision one —
+   it hands you a ready-to-use `DATABASE_URL`. Any other hosted Postgres
+   works too.
+2. **Import the repo**: [app.netlify.com](https://app.netlify.com) →
+   **Add new site → Import an existing project** → pick this GitHub repo
+   (`runadeesu/ReinAI888`) and the `claude/reinai-platform-dev-zo9kqq` branch
+   (or `main` once merged). Netlify reads `netlify.toml` automatically —
+   no build settings to fill in by hand.
+3. **Set environment variables** under **Site configuration → Environment
+   variables** (same names as `.env.example`):
+   - `DATABASE_URL` — from step 1
+   - `AUTH_SECRET`, `ENCRYPTION_KEY` — generate with the commands above
+   - `NEXTAUTH_URL` — your Netlify URL, e.g. `https://your-site.netlify.app`
+     (update this if you attach a custom domain)
+   - `SMTP_*` — optional but recommended for production so verification/reset
+     emails actually send instead of only logging server-side
+   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — optional, for Google login
+   - `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` /
+     `NVIDIA_API_KEY` — optional server-wide default provider keys; users can
+     also add their own from Settings → API Keys regardless
+   - Netlify Blobs needs no manual credentials — it's automatically
+     available to Functions on a site once deployed there.
+4. **Deploy.** The build runs `npx prisma migrate deploy && pnpm build`
+   (from `netlify.toml`), applying any pending migrations to `DATABASE_URL`
+   before building. Subsequent pushes to the connected branch redeploy
+   automatically.
+
+If you'd rather I drive the deploy directly (Netlify CLI, non-interactively)
+instead of the dashboard flow above, add a `NETLIFY_AUTH_TOKEN` (and either a
+`NETLIFY_SITE_ID` for an existing site or let `netlify init` create one) to
+this environment and say so — that's the only thing this repo can't do for
+itself.
 
 ## Scripts
 

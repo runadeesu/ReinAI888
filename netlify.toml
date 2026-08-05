@@ -1,0 +1,14 @@
+[build]
+  command = "npx prisma migrate deploy && pnpm build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # Marks the deploy environment for our storage adapter — see
+  # src/lib/files/storage.ts — so uploads route to Netlify Blobs instead of
+  # local disk (Netlify also sets this automatically at runtime; declaring it
+  # here keeps behavior explicit and makes `netlify build` locally match).
+  NETLIFY = "true"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

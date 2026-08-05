@@ -1,14 +1,15 @@
 // ReinAI database schema
-// Default datasource is SQLite for zero-config local/dev use.
-// Point DATABASE_URL at a Postgres/MySQL connection string in production
-// and change the "provider" below accordingly.
+// Postgres, so this deploys cleanly on serverless hosts (Netlify, Vercel, ...)
+// where the filesystem isn't persistent and SQLite can't be used. Point
+// DATABASE_URL at any Postgres instance — a local one for dev (see README),
+// a hosted one (Neon/Supabase/RDS/...) in production.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
