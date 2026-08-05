@@ -104,10 +104,22 @@ Functions/Edge Functions automatically), and file uploads switch to Netlify
 Blobs at runtime (see `src/lib/files/storage.ts`). This part needs to be done
 from your own Netlify account — no CLI token for it lives in this repo/session:
 
-1. **Get a Postgres database.** Easiest: in the Netlify dashboard, go to
-   **Extensions → Neon** (or **Extensions → Supabase**) and provision one —
-   it hands you a ready-to-use `DATABASE_URL`. Any other hosted Postgres
-   works too.
+1. **Get a Postgres database via the Supabase extension.** (Netlify's own
+   built-in "Netlify DB", powered by Neon, is discontinued — its extension
+   page now shows a deprecation notice and no longer provisions new
+   databases; don't use it.) In the Netlify dashboard: **Extensions →
+   Supabase → Connect**, sign in/create a free Supabase account, pick a
+   project. Then take the connection string from **that Supabase project's
+   dashboard → Connect → "Transaction pooler" tab**, not the "direct
+   connection" one — direct connections are IPv6-only on Supabase's free
+   tier and unreachable from Netlify Functions (AWS Lambda has no outbound
+   IPv6 route), which fails with `Can't reach database server` at deploy
+   time. The pooler string looks like:
+   `postgresql://postgres.<ref>:<password>@aws-<n>-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require`
+   — the `pgbouncer=true` param is required too; it tells Prisma to skip
+   prepared statements, which Supavisor's transaction-pooling mode doesn't
+   support. Any other hosted Postgres reachable over IPv4 works too, this
+   is just what's already wired up.
 2. **Import the repo**: [app.netlify.com](https://app.netlify.com) →
    **Add new site → Import an existing project** → pick this GitHub repo
    (`runadeesu/ReinAI888`) and the `claude/reinai-platform-dev-zo9kqq` branch
