@@ -1,0 +1,283 @@
+// ReinAI database schema
+// Default datasource is SQLite for zero-config local/dev use.
+// Point DATABASE_URL at a Postgres/MySQL connection string in production
+// and change the "provider" below accordingly.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth (Auth.js / NextAuth compatible models)
+// ---------------------------------------------------------------------------
+
+model User {
+  id                String    @id @default(cuid())
+  name              String?
+  displayId         String    @unique // stable, user-facing account id, e.g. "reinai-8f3ka2"
+  email             String    @unique
+  emailVerified     DateTime?
+  image             String?
+  passwordHash      String? // null for OAuth-only accounts
+  bio               String?
+  twoFactorEnabled  Boolean   @default(false)
+  twoFactorSecret   String? // encrypted TOTP secret
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  accounts          Account[]
+  sessions          Session[]
+  loginHistory      LoginHistory[]
+  conversations     Conversation[]
+  folders           Folder[]
+  projects          Project[]
+  prompts           Prompt[]
+  promptCategories  PromptCategory[]
+  apiKeys           ApiKey[]
+  attachments       Attachment[]
+  passwordResetTokens PasswordResetToken[]
+  emailChangeTokens   EmailChangeToken[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  userAgent    String?
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+  lastSeenAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expires   DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EmailChangeToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  newEmail  String
+  expires   DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LoginHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  ipAddress String?
+  userAgent String?
+  method    String // "credentials" | "google" | "totp"
+  success   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Organization: projects & folders
+// ---------------------------------------------------------------------------
+
+model Project {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  color       String?
+  lastUsedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  prompts       Prompt[]
+
+  @@index([userId])
+}
+
+model Folder {
+  id        String   @id @default(cuid())
+  userId    String
+  parentId  String?
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent        Folder?        @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
+  children      Folder[]       @relation("FolderToFolder")
+  conversations Conversation[]
+
+  @@index([userId])
+  @@index([parentId])
+}
+
+// ---------------------------------------------------------------------------
+// Chat
+// ---------------------------------------------------------------------------
+
+model Conversation {
+  id            String   @id @default(cuid())
+  userId        String
+  projectId     String?
+  folderId      String?
+  title         String   @default("New chat")
+  provider      String   @default("anthropic")
+  model         String   @default("claude-sonnet-5")
+  systemPrompt  String?
+  isPinned      Boolean  @default(false)
+  isFavorite    Boolean  @default(false)
+  tags          String   @default("[]") // JSON-encoded string[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project     Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  folder      Folder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  messages    Message[]
+  attachments Attachment[]
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([folderId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String // "user" | "assistant" | "system"
+  content        String
+  provider       String?
+  model          String?
+  promptTokens   Int?
+  completionTokens Int?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments  Attachment[]
+
+  @@index([conversationId])
+}
+
+model Attachment {
+  id             String   @id @default(cuid())
+  userId         String
+  conversationId String?
+  messageId      String?
+  fileName       String
+  mimeType       String
+  sizeBytes      Int
+  storagePath    String
+  extractedText  String? // parsed text content used as AI context
+  createdAt      DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message      Message?      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([conversationId])
+}
+
+// ---------------------------------------------------------------------------
+// Prompt templates
+// ---------------------------------------------------------------------------
+
+model PromptCategory {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prompts Prompt[]
+
+  @@index([userId])
+}
+
+model Prompt {
+  id         String   @id @default(cuid())
+  userId     String
+  projectId  String?
+  categoryId String?
+  title      String
+  content    String
+  isFavorite Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project  Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  category PromptCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([categoryId])
+}
+
+// ---------------------------------------------------------------------------
+// AI provider API keys (encrypted at rest)
+// ---------------------------------------------------------------------------
+
+model ApiKey {
+  id             String   @id @default(cuid())
+  userId         String
+  provider       String // "anthropic" | "openai" | "google" | ...
+  label          String?
+  encryptedKey   String
+  iv             String
+  authTag        String
+  lastFour       String // last 4 chars of the plaintext key, for display only
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
