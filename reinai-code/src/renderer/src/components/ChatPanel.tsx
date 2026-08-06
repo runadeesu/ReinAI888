@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import type { AgentEvent, AiProviderId, ChatMessage } from "../../../shared/types";
+import { DiffView } from "./DiffView";
 
 interface TimelineItem {
   id: string;
-  kind: "message" | "tool";
+  kind: "message" | "tool" | "diff";
   role?: "user" | "assistant";
   content: string;
   toolName?: string;
+  diffPath?: string;
+  diffBefore?: string;
+  diffAfter?: string;
 }
 
 interface ChatPanelProps {
@@ -24,6 +28,23 @@ export function ChatPanel({ projectRoot, provider, model }: ChatPanelProps) {
   const streamingIdRef = useRef<string | null>(null);
   const assistantTextRef = useRef("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const hasLoadedRef = useRef(false);
+
+  useEffect(() => {
+    hasLoadedRef.current = false;
+    window.reinai.loadConversation(projectRoot).then((saved) => {
+      setConversation(saved);
+      setTimeline(
+        saved.map((m) => ({ id: m.id, kind: "message" as const, role: m.role, content: m.content }))
+      );
+      hasLoadedRef.current = true;
+    });
+  }, [projectRoot]);
+
+  useEffect(() => {
+    if (!hasLoadedRef.current) return;
+    window.reinai.saveConversation(projectRoot, conversation);
+  }, [conversation, projectRoot]);
 
   useEffect(() => {
     const unsubscribe = window.reinai.onAgentEvent((event: AgentEvent) => {
@@ -55,6 +76,18 @@ export function ChatPanel({ projectRoot, provider, model }: ChatPanelProps) {
             kind: "tool",
             toolName: event.toolName,
             content: event.result.length > 500 ? event.result.slice(0, 500) + "..." : event.result,
+          },
+        ]);
+      } else if (event.type === "file-diff") {
+        setTimeline((prev) => [
+          ...prev,
+          {
+            id: `diff-${Date.now()}-${Math.random()}`,
+            kind: "diff",
+            content: "",
+            diffPath: event.path,
+            diffBefore: event.before,
+            diffAfter: event.after,
           },
         ]);
       } else if (event.type === "error") {
@@ -103,7 +136,9 @@ export function ChatPanel({ projectRoot, provider, model }: ChatPanelProps) {
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
       <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
         {timeline.map((item) =>
-          item.kind === "tool" ? (
+          item.kind === "diff" ? (
+            <DiffView key={item.id} path={item.diffPath!} before={item.diffBefore!} after={item.diffAfter!} />
+          ) : item.kind === "tool" ? (
             <div
               key={item.id}
               style={{

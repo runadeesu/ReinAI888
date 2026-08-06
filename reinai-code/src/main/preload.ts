@@ -25,6 +25,7 @@ type AgentEvent =
   | { type: "text-delta"; text: string }
   | { type: "tool-call"; toolName: string; args: Record<string, unknown> }
   | { type: "tool-result"; toolName: string; result: string }
+  | { type: "file-diff"; path: string; before: string; after: string }
   | { type: "done" }
   | { type: "error"; message: string };
 
@@ -54,6 +55,10 @@ const api = {
     ipcRenderer.on("agent:event", listener);
     return () => ipcRenderer.removeListener("agent:event", listener);
   },
+  loadConversation: (projectRoot: string): Promise<ChatMessage[]> =>
+    ipcRenderer.invoke("conversation:load", projectRoot),
+  saveConversation: (projectRoot: string, conversation: ChatMessage[]): Promise<void> =>
+    ipcRenderer.invoke("conversation:save", projectRoot, conversation),
 };
 
 contextBridge.exposeInMainWorld("reinai", api);

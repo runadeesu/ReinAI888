@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { listDirectory, readFile } from "./ipc/fs.js";
 import { getSettings, setProviderAndModel, setApiKey } from "./ipc/settings.js";
 import { runAgent } from "./ipc/agent.js";
+import { loadConversation, saveConversation } from "./ipc/persistence.js";
 import type { AiProviderId, ChatMessage } from "../shared/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -85,4 +86,12 @@ ipcMain.on(
 
 ipcMain.on("agent:stop", () => {
   currentAgentController?.abort();
+});
+
+ipcMain.handle("conversation:load", async (_event, projectRoot: string) => {
+  return loadConversation(projectRoot);
+});
+
+ipcMain.handle("conversation:save", async (_event, projectRoot: string, conversation: ChatMessage[]) => {
+  saveConversation(projectRoot, conversation);
 });

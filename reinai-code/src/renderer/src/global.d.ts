@@ -17,6 +17,8 @@ declare global {
       }) => void;
       stopAgent: () => void;
       onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
+      loadConversation: (projectRoot: string) => Promise<ChatMessage[]>;
+      saveConversation: (projectRoot: string, conversation: ChatMessage[]) => Promise<void>;
     };
   }
 }

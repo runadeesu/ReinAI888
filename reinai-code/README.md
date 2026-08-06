@@ -28,16 +28,22 @@ ReinAI web app.
   path outside it is rejected before any read/write happens.
 - Commands run with a 120s timeout and capped output (20k chars) so a
   runaway process/log can't hang or flood the UI.
+- Every `write_file` call shows a real line-level diff (added/removed lines,
+  color-coded) inline in the chat right after it happens, so you can see
+  exactly what changed without opening the file.
+- Conversation history persists per opened project folder (keyed by a hash
+  of its path, stored under Electron's userData dir) — closing and reopening
+  the app on the same folder resumes where you left off.
+- Custom app icon (`build/icon.ico` / `build/icon.png`), used for the exe,
+  the installer, and the taskbar/window icon.
 
 ## Not yet built (roadmap, not stubbed)
 
-- No inline diff view for file edits (writes happen directly; there's no
-  "review before applying" step yet).
+- Writes still apply immediately — the diff is shown *after* the fact for
+  visibility, not as a pre-apply approval gate yet.
 - No syntax highlighting / code editor in the file tree — it's read-only,
   navigation-only for now.
-- No conversation persistence across app restarts (in-memory per session).
 - No cancel-mid-tool-call granularity — stopping aborts the whole turn.
-- No custom app icon yet (uses electron-builder's default).
 
 ## Development
 
@@ -56,9 +62,12 @@ pnpm run dist:win    # packages via electron-builder — outputs to release/
 ```
 
 Produces both an NSIS installer (`ReinAI Code Setup <version>.exe`) and a
-portable single-file `.exe` under `release/`. Cross-building the Windows
-target from Linux/macOS needs Wine installed; building directly on Windows
-needs nothing extra.
+portable single-file `.exe` under `release/`. Building directly on Windows
+needs nothing extra. Cross-building from Linux needs **both** 64-bit and
+32-bit Wine (`wine64` + `wine32` + their `libwine` counterparts) — the NSIS
+installer step and the exe metadata-embedding step (`rcedit`) specifically
+need the 32-bit loader even though the app itself only targets x64; wine64
+alone gets an unhelpful `could not exec the wine loader` error.
 
 ## Architecture notes
 

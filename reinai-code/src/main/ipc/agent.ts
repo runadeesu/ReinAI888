@@ -14,7 +14,14 @@ const SYSTEM_PROMPT = `あなたはReinAI Codeです。ユーザーのPC上の�
 - 破壊的な操作(削除、force pushなど)を行う前は、その旨を説明してください。
 - 出力は簡潔に。前置きや繰り返しは避け、行った作業と結果を明確に報告してください。`;
 
-function buildTools(projectRoot: string) {
+interface PendingDiff {
+  toolCallId: string;
+  path: string;
+  before: string;
+  after: string;
+}
+
+function buildTools(projectRoot: string, diffQueue: PendingDiff[]) {
   return {
     list_directory: tool({
       description: "プロジェクトフォルダ内のディレクトリの内容を一覧表示する",
@@ -39,8 +46,18 @@ function buildTools(projectRoot: string) {
         path: z.string().describe("プロジェクトルートからの相対パス"),
         content: z.string().describe("ファイルの新しい内容(全体)"),
       }),
-      execute: async ({ path: relPath, content }: { path: string; content: string }) => {
+      execute: async (
+        { path: relPath, content }: { path: string; content: string },
+        { toolCallId }: { toolCallId: string }
+      ) => {
+        let before = "";
+        try {
+          before = await readFile(projectRoot, relPath);
+        } catch {
+          before = "";
+        }
         await writeFile(projectRoot, relPath, content);
+        diffQueue.push({ toolCallId, path: relPath, before, after: content });
         return `書き込み完了: ${relPath} (${content.length}文字)`;
       },
     }),
@@ -70,13 +87,14 @@ export async function* runAgent(
   }
 
   const messages: ModelMessage[] = conversation.map((m) => ({ role: m.role, content: m.content }));
+  const diffQueue: PendingDiff[] = [];
 
   try {
     const result = streamText({
       model: getLanguageModel(provider, model, apiKey),
       system: SYSTEM_PROMPT,
       messages,
-      tools: buildTools(projectRoot),
+      tools: buildTools(projectRoot, diffQueue),
       stopWhen: stepCountIs(20),
       abortSignal: signal,
     });
@@ -89,9 +107,18 @@ export async function* runAgent(
         case "tool-call":
           yield { type: "tool-call", toolName: part.toolName, args: (part.input as Record<string, unknown>) ?? {} };
           break;
-        case "tool-result":
+        case "tool-result": {
           yield { type: "tool-result", toolName: part.toolName, result: String(part.output ?? "") };
+          if (part.toolName === "write_file") {
+            const toolCallId = (part as { toolCallId?: string }).toolCallId;
+            const idx = diffQueue.findIndex((d) => d.toolCallId === toolCallId);
+            if (idx !== -1) {
+              const diff = diffQueue.splice(idx, 1)[0];
+              yield { type: "file-diff", path: diff.path, before: diff.before, after: diff.after };
+            }
+          }
           break;
+        }
         case "error":
           yield { type: "error", message: part.error instanceof Error ? part.error.message : String(part.error) };
           break;

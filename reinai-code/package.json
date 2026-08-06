@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "author": "ReinAI",
   "description": "ReinAI Code — a desktop AI pair-programmer that reads, edits, and runs commands in a local project folder.",
   "main": "dist/main/index.js",
   "scripts": {
@@ -19,6 +20,7 @@
     "@ai-sdk/google": "^4.0.34",
     "@ai-sdk/openai": "^4.0.30",
     "ai": "^7.0.52",
+    "diff": "^9.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -51,8 +53,18 @@
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {
