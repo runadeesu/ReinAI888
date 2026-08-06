@@ -18,12 +18,6 @@ export async function getAvailableProviders(userId: string): Promise<AiProviderI
     .map((p) => p.id);
 }
 
-/** Whether the given user's resolved key for this provider is their own (vs. the server default). */
-export async function hasOwnKey(userId: string, provider: AiProviderId): Promise<boolean> {
-  const stored = await prisma.apiKey.findUnique({ where: { userId_provider: { userId, provider } } });
-  return Boolean(stored);
-}
-
 /**
  * Resolves the API key to use for a given user + provider.
  * A user's own encrypted key (Settings -> API Keys) always takes
