@@ -32,12 +32,9 @@ model User {
   bio               String?
   twoFactorEnabled  Boolean   @default(false)
   twoFactorSecret   String? // encrypted TOTP secret
-  role              String    @default("user") // "user" | "admin" — admins bypass plan quotas entirely
-  plan              String    @default("FREE") // "FREE" | "PRO" | "MASTER" — see src/lib/billing/plans.ts
-  dailyTokensUsed     Int      @default(0)
+  role              String    @default("user") // "user" | "admin" — admins bypass the free-tier token quota entirely
+  dailyTokensUsed     Int      @default(0) // server-key NVIDIA/OpenRouter usage only; a user's own key is never metered
   dailyTokensResetAt  DateTime @default(now())
-  stripeCustomerId     String? @unique
-  stripeSubscriptionId String? @unique
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

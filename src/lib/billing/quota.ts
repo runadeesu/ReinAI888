@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/db/prisma";
-import { getPlan } from "@/lib/billing/plans";
+
+// Daily token budget for server-provided free-tier models (NVIDIA /
+// OpenRouter) only. A user's own registered API key is never subject to
+// this, for any provider. Admins bypass the quota entirely.
+const DAILY_FREE_PROVIDER_TOKEN_LIMIT = 20_000;
 
 function startOfTodayUtc(): Date {
   const d = new Date();
@@ -7,23 +11,17 @@ function startOfTodayUtc(): Date {
   return d;
 }
 
-/**
- * Token quota for server-provided free-tier models (NVIDIA / OpenRouter)
- * only — a user's own registered API key is never subject to this, for any
- * provider. Admins bypass the quota entirely.
- */
 export async function checkQuota(userId: string): Promise<{ ok: boolean; remaining: number }> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { role: true, plan: true, dailyTokensUsed: true, dailyTokensResetAt: true },
+    select: { role: true, dailyTokensUsed: true, dailyTokensResetAt: true },
   });
   if (!user) return { ok: false, remaining: 0 };
   if (user.role === "admin") return { ok: true, remaining: Infinity };
 
   const today = startOfTodayUtc();
   const used = user.dailyTokensResetAt < today ? 0 : user.dailyTokensUsed;
-  const limit = getPlan(user.plan).dailyFreeProviderTokens;
-  return { ok: used < limit, remaining: Math.max(0, limit - used) };
+  return { ok: used < DAILY_FREE_PROVIDER_TOKEN_LIMIT, remaining: Math.max(0, DAILY_FREE_PROVIDER_TOKEN_LIMIT - used) };
 }
 
 export async function consumeQuota(userId: string, tokens: number): Promise<void> {
