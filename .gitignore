@@ -56,3 +56,6 @@ next-env.d.ts
 # via Netlify CLI, deliberately not committed to git (would bloat repo
 # history with 80MB+ binaries on every version bump)
 /public/downloads/*.exe
+
+# one-off scripts used to push binaries to blob storage, not part of the app
+/upload_exes.mjs
