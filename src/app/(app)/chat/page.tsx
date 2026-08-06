@@ -1,19 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Send, Loader2 } from "lucide-react";
+import { ModelSelector } from "@/components/chat/model-selector";
+import { AI_PROVIDERS, type AiProviderId } from "@/lib/ai/models";
+
+const LAST_PROVIDER_KEY = "reinai-last-provider";
+const LAST_MODEL_KEY = "reinai-last-model";
 
 export default function NewChatPage() {
   const router = useRouter();
   const [value, setValue] = useState("");
   const [loading, setLoading] = useState(false);
+  const [provider, setProvider] = useState<AiProviderId>("openrouter");
+  const [model, setModel] = useState<string>(AI_PROVIDERS.openrouter.models[0].id);
+
+  useEffect(() => {
+    const savedProvider = localStorage.getItem(LAST_PROVIDER_KEY) as AiProviderId | null;
+    const savedModel = localStorage.getItem(LAST_MODEL_KEY);
+    if (savedProvider && AI_PROVIDERS[savedProvider]) {
+      const validModel = AI_PROVIDERS[savedProvider].models.find((m) => m.id === savedModel);
+      setProvider(savedProvider);
+      setModel(validModel ? validModel.id : AI_PROVIDERS[savedProvider].models[0].id);
+    }
+  }, []);
+
+  function handleModelChange(nextProvider: AiProviderId, nextModel: string) {
+    setProvider(nextProvider);
+    setModel(nextModel);
+    localStorage.setItem(LAST_PROVIDER_KEY, nextProvider);
+    localStorage.setItem(LAST_MODEL_KEY, nextModel);
+  }
 
   async function handleStart() {
     if (!value.trim() || loading) return;
     setLoading(true);
 
-    const res = await fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    const res = await fetch("/api/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider, model }),
+    });
     const data = await res.json();
     const conversationId = data.conversation.id;
 
@@ -28,7 +56,10 @@ export default function NewChatPage() {
         <p className="mt-2 text-sm text-[var(--muted)]">
           コード生成、バグ修正、リファクタリング、アーキテクチャ設計など、なんでも聞いてください。
         </p>
-        <div className="mt-6 flex items-end gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2">
+        <div className="mt-4 flex justify-center">
+          <ModelSelector provider={provider} model={model} onChange={handleModelChange} />
+        </div>
+        <div className="mt-4 flex items-end gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2">
           <textarea
             value={value}
             onChange={(e) => setValue(e.target.value)}

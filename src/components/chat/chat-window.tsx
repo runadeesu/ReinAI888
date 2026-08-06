@@ -125,6 +125,8 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
 
   async function handleModelChange(provider: AiProviderId, model: string) {
     setConversation((prev) => (prev ? { ...prev, provider, model } : prev));
+    localStorage.setItem("reinai-last-provider", provider);
+    localStorage.setItem("reinai-last-model", model);
     await fetch(`/api/conversations/${conversationId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
