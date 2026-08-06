@@ -2,13 +2,15 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 
-// Netlify Functions/Edge Functions have no persistent, writable local disk
-// across invocations, so uploads there go to Netlify Blobs instead. Netlify
-// sets NETLIFY=true in every build and runtime environment it controls.
-// Locally (and on any other Node host with a real filesystem) we just write
-// to UPLOAD_DIR. Both backends share the same `storagePath` key format, so
-// the value stored in Attachment.storagePath is backend-agnostic.
-const useNetlifyBlobs = process.env.NETLIFY === "true";
+// Serverless hosts have no persistent, writable local disk across
+// invocations, so uploads there go to the host's blob storage instead.
+// Vercel sets VERCEL=1 and Netlify sets NETLIFY=true in every build and
+// runtime environment they control. Locally (and on any other Node host
+// with a real filesystem) we just write to UPLOAD_DIR. All backends share
+// the same `storagePath` key format, so the value stored in
+// Attachment.storagePath is backend-agnostic.
+const useVercelBlob = process.env.VERCEL === "1";
+const useNetlifyBlobs = !useVercelBlob && process.env.NETLIFY === "true";
 
 const UPLOAD_ROOT = path.resolve(process.cwd(), process.env.UPLOAD_DIR ?? "./storage/uploads");
 
@@ -25,6 +27,12 @@ async function getBlobStore() {
 export async function saveFile(userId: string, fileName: string, buffer: Buffer): Promise<string> {
   const key = buildKey(userId, fileName);
 
+  if (useVercelBlob) {
+    const { put } = await import("@vercel/blob");
+    await put(key, buffer, { access: "public", addRandomSuffix: false });
+    return key;
+  }
+
   if (useNetlifyBlobs) {
     const store = await getBlobStore();
     await store.set(key, new Blob([new Uint8Array(buffer)]));
@@ -38,6 +46,13 @@ export async function saveFile(userId: string, fileName: string, buffer: Buffer)
 }
 
 export async function readFile(storagePath: string): Promise<Buffer> {
+  if (useVercelBlob) {
+    const { get } = await import("@vercel/blob");
+    const result = await get(storagePath, { access: "public" });
+    if (!result || !result.stream) throw new Error("File not found in blob storage");
+    return Buffer.from(await new Response(result.stream).arrayBuffer());
+  }
+
   if (useNetlifyBlobs) {
     const store = await getBlobStore();
     const data = await store.get(storagePath, { type: "arrayBuffer" });
@@ -53,6 +68,12 @@ export async function readFile(storagePath: string): Promise<Buffer> {
 }
 
 export async function deleteFile(storagePath: string): Promise<void> {
+  if (useVercelBlob) {
+    const { del } = await import("@vercel/blob");
+    await del(storagePath);
+    return;
+  }
+
   if (useNetlifyBlobs) {
     const store = await getBlobStore();
     await store.delete(storagePath);

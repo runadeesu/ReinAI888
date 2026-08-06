@@ -5,11 +5,11 @@ import { NextResponse } from "next/server";
 // arbitrary filename param and looking it up in the store directly.
 const DOWNLOADS: Record<string, { blobKey: string; fileName: string }> = {
   "reinai-code-setup": {
-    blobKey: "ReinAI Code Setup 0.1.0.exe",
+    blobKey: "reinai-code/ReinAI-Code-Setup-0.1.0.exe",
     fileName: "ReinAI Code Setup 0.1.0.exe",
   },
   "reinai-code-portable": {
-    blobKey: "ReinAI Code Portable 0.1.0.exe",
+    blobKey: "reinai-code/ReinAI-Code-Portable-0.1.0.exe",
     fileName: "ReinAI Code Portable 0.1.0.exe",
   },
 };
@@ -19,6 +19,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const entry = DOWNLOADS[slug];
   if (!entry) {
     return NextResponse.json({ error: "見つかりません" }, { status: 404 });
+  }
+
+  if (process.env.VERCEL === "1") {
+    const { head } = await import("@vercel/blob");
+    try {
+      const blob = await head(entry.blobKey);
+      return NextResponse.redirect(blob.downloadUrl);
+    } catch {
+      return NextResponse.json({ error: "ファイルが見つかりません" }, { status: 404 });
+    }
   }
 
   const { getStore } = await import("@netlify/blobs");

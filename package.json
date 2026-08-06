@@ -15,6 +15,7 @@
     "@auth/prisma-adapter": "^2.11.3",
     "@netlify/blobs": "^10.7.12",
     "@prisma/client": "^6.19.3",
+    "@vercel/blob": "^2.6.1",
     "ai": "^7.0.52",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
