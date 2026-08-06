@@ -3,6 +3,7 @@
 import { Menu } from "lucide-react";
 import { Sidebar } from "@/components/sidebar/sidebar";
 import { SidebarProvider, useSidebar } from "@/components/sidebar/sidebar-context";
+import { ReinAILogo } from "@/components/brand/logo";
 
 function MobileTopBar() {
   const { toggle } = useSidebar();
@@ -15,7 +16,7 @@ function MobileTopBar() {
       >
         <Menu size={20} />
       </button>
-      <span className="text-sm font-semibold">ReinAI</span>
+      <ReinAILogo size={16} />
     </div>
   );
 }

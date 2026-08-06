@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { useSidebar } from "@/components/sidebar/sidebar-context";
+import { ReinAILogo } from "@/components/brand/logo";
 import type { ConversationSummary, FolderItem, ProjectItem } from "@/types/api";
 import { cn } from "@/lib/utils/cn";
 
@@ -113,8 +114,8 @@ export function Sidebar() {
         )}
       >
       <div className="flex items-center justify-between px-4 py-4">
-        <Link href="/chat" className="text-lg font-bold tracking-tight">
-          ReinAI
+        <Link href="/chat" className="flex items-center">
+          <ReinAILogo size={19} />
         </Link>
         <div className="flex items-center gap-1">
           <button onClick={toggleTheme} className="rounded-lg p-1.5 hover:bg-[var(--surface-hover)]" title="テーマ切替">
