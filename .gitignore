@@ -51,3 +51,8 @@ next-env.d.ts
 # uploaded files
 /storage/uploads/*
 !/storage/uploads/.gitkeep
+
+# ReinAI Code distributable binaries — deployed as static downloads directly
+# via Netlify CLI, deliberately not committed to git (would bloat repo
+# history with 80MB+ binaries on every version bump)
+/public/downloads/*.exe
