@@ -163,22 +163,32 @@ itself.
 - `npx prisma migrate dev` — create/apply a new migration after schema changes
 - `npx prisma studio` — inspect the database
 
+## ReinAI Code
+
+`reinai-code/` is a companion desktop app — a real AI pair-programmer that
+reads/writes files and runs shell commands in a local project folder (the
+same tool-calling loop Claude Code/Codex CLI use), with a chat + file-tree
+GUI instead of a terminal. It's an independent Electron project (its own
+`pnpm-workspace.yaml`, dependency tree, and build), not part of this Next.js
+app's build/deploy — see `reinai-code/README.md` for dev setup and how to
+build the Windows installer/portable `.exe`.
+
 ## Roadmap (not in this pass)
 
 The prompt behind this project asks for a full cross-platform suite (Web,
-Windows/macOS/Linux desktop apps, Android/iOS, plus a separate "ReinAI Code"
-developer app). This pass delivers a genuinely working, commercially-shaped
-web core end to end; the following are natural next milestones on top of it,
+Windows/macOS/Linux desktop apps, Android/iOS, plus ReinAI Code — now built,
+see above). This pass delivers a genuinely working, commercially-shaped web
+core end to end; the following are natural next milestones on top of it,
 intentionally not stubbed out here since a fake "coming soon" screen would
 violate the no-placeholder goal of the project more than simply not building it
 yet:
 
-- **Desktop**: wrap this app with Tauri (small footprint, real installers via
-  CI on each OS runner, including a Windows `.exe`)
+- **Desktop wrapper for the web app**: wrap this Next.js app with Tauri
+  (small footprint, real installers via CI on each OS runner)
 - **Mobile**: wrap with Capacitor for Android/iOS, or a React Native client
   reusing `src/lib` core logic
-- **ReinAI Code**: a second Next.js (or IDE-extension) app sharing `src/lib`
-  for repo-aware chat, inline code actions, and Git/terminal integration
+- **ReinAI Code polish**: inline diff review before applying file edits, a
+  read/write code editor pane, conversation persistence, custom app icon
 - **Realtime sync**: multi-device conversation sync via WebSockets/Pusher-style
   provider once a hosted backend is chosen
 - **Image/video generation**: wire in provider-specific endpoints

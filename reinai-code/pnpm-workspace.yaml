@@ -1,0 +1,7 @@
+# Deliberately present (even empty) so pnpm treats reinai-code/ as its own
+# workspace root and stops walking up to the parent ReinAI888 repo's
+# pnpm-workspace.yaml — otherwise pnpm silently no-ops here since this
+# folder isn't listed as a workspace member up there. This keeps ReinAI Code
+# fully independent: its own install, lockfile, and dependency tree.
+packages:
+  - "."
