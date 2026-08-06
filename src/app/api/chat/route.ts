@@ -2,11 +2,16 @@ import { streamText, type ModelMessage } from "ai";
 import { prisma } from "@/lib/db/prisma";
 import { requireUserId } from "@/lib/auth/session";
 import { getLanguageModel } from "@/lib/ai/client";
-import { resolveApiKey } from "@/lib/ai/resolve-key";
+import { resolveApiKey, hasOwnKey } from "@/lib/ai/resolve-key";
 import { buildSystemPrompt } from "@/lib/ai/system-prompt";
 import type { AiProviderId } from "@/lib/ai/models";
 import { sendMessageSchema } from "@/lib/validation/schemas";
 import { rateLimit } from "@/lib/rate-limit/limiter";
+import { checkQuota, consumeQuota } from "@/lib/billing/quota";
+
+// Server-provided free-tier providers whose usage is metered per plan when
+// the request isn't using the user's own registered key for that provider.
+const QUOTA_GATED_PROVIDERS = new Set(["nvidia", "openrouter"]);
 
 // Some free-tier / large models take a while to finish generating; give the
 // underlying function more room than Next's default before the platform
@@ -46,6 +51,23 @@ export async function POST(request: Request) {
       }),
       { status: 400 }
     );
+  }
+
+  // A user's own registered key is always unlimited; only server-provided
+  // free-tier keys (NVIDIA / OpenRouter) are metered per plan.
+  const usingServerKey = !(await hasOwnKey(userId, provider));
+  const quotaGated = usingServerKey && QUOTA_GATED_PROVIDERS.has(provider);
+
+  if (quotaGated) {
+    const quota = await checkQuota(userId);
+    if (!quota.ok) {
+      return new Response(
+        JSON.stringify({
+          error: "本日の無料枠(トークン)を使い切りました。プランをアップグレードするか、設定 > APIキー からご自身のAPIキーを登録してください。",
+        }),
+        { status: 429 }
+      );
+    }
   }
 
   let priorMessages;
@@ -135,6 +157,10 @@ export async function POST(request: Request) {
         where: { id: conversationId },
         data: { updatedAt: new Date() },
       });
+      if (quotaGated) {
+        const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
+        await consumeQuota(userId, totalTokens);
+      }
     },
     onError: ({ error }) => {
       console.error("[ReinAI chat stream error]", error);

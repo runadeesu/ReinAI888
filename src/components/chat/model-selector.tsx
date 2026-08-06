@@ -13,6 +13,7 @@ interface ModelSelectorProps {
 
 export function ModelSelector({ provider, model, onChange }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
+  const [availableProviders, setAvailableProviders] = useState<AiProviderId[] | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -23,7 +24,16 @@ export function ModelSelector({ provider, model, onChange }: ModelSelectorProps)
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
+  useEffect(() => {
+    fetch("/api/ai/providers")
+      .then((r) => r.json())
+      .then((d) => setAvailableProviders(d.providers ?? []));
+  }, []);
+
   const currentModel = AI_PROVIDERS[provider as AiProviderId]?.models.find((m) => m.id === model);
+  const visibleProviders = Object.values(AI_PROVIDERS).filter(
+    (p) => availableProviders === null || availableProviders.includes(p.id)
+  );
 
   return (
     <div className="relative" ref={ref}>
@@ -36,7 +46,12 @@ export function ModelSelector({ provider, model, onChange }: ModelSelectorProps)
       </button>
       {open && (
         <div className="absolute right-0 top-full z-20 mt-1 max-h-[60vh] w-80 max-w-[90vw] overflow-y-auto overscroll-contain rounded-xl border border-[var(--border)] bg-[var(--background)] p-2 shadow-lg sm:left-0 sm:right-auto">
-          {Object.values(AI_PROVIDERS).map((p) => (
+          {visibleProviders.length === 0 && (
+            <p className="px-2 py-3 text-center text-xs text-[var(--muted)]">
+              利用可能なAPIキーがありません。設定 &gt; APIキー から登録してください。
+            </p>
+          )}
+          {visibleProviders.map((p) => (
             <div key={p.id} className="mb-2 last:mb-0">
               <p className="px-2 py-1 text-xs font-semibold text-[var(--muted)]">{p.label}</p>
               {p.models.map((m) => (

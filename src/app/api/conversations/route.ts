@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireUserId } from "@/lib/auth/session";
 import { conversationSchema } from "@/lib/validation/schemas";
 import { AI_PROVIDERS } from "@/lib/ai/models";
+import { getAvailableProviders } from "@/lib/ai/resolve-key";
 
 export async function GET(request: Request) {
   const userId = await requireUserId();
@@ -53,7 +54,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "入力が正しくありません" }, { status: 400 });
   }
 
-  const provider = parsed.data.provider ?? "anthropic";
+  const available = await getAvailableProviders(userId);
+  const provider = parsed.data.provider ?? available[0] ?? "anthropic";
   const defaultModel = AI_PROVIDERS[provider as keyof typeof AI_PROVIDERS]?.models[0]?.id ?? "claude-sonnet-5";
 
   const conversation = await prisma.conversation.create({

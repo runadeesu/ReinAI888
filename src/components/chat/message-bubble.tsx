@@ -131,7 +131,7 @@ export function MessageBubble({
             </div>
 
             {isUser && content && !pending && (
-              <div className="mt-1 hidden items-center gap-1 group-hover:flex">
+              <div className="mt-1 flex items-center gap-1">
                 <button
                   onClick={handleCopy}
                   title="コピー"

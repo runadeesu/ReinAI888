@@ -1,0 +1,13 @@
+import Stripe from "stripe";
+
+let client: Stripe | null = null;
+
+/** Returns null (rather than throwing) when Stripe isn't configured yet, so callers can degrade gracefully. */
+export function getStripe(): Stripe | null {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) return null;
+  if (!client) {
+    client = new Stripe(key);
+  }
+  return client;
+}

@@ -4,6 +4,7 @@ const NAV = [
   { href: "/settings/profile", label: "プロフィール" },
   { href: "/settings/account", label: "アカウント・セキュリティ" },
   { href: "/settings/api-keys", label: "APIキー" },
+  { href: "/settings/billing", label: "プラン・お支払い" },
   { href: "/settings/appearance", label: "外観" },
 ];
 
