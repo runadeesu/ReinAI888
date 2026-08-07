@@ -11,6 +11,7 @@ export default function ProfilePage() {
   const [bio, setBio] = useState("");
   const [image, setImage] = useState("");
   const [displayId, setDisplayId] = useState("");
+  const [customInstructions, setCustomInstructions] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -24,6 +25,7 @@ export default function ProfilePage() {
           setBio(d.user.bio ?? "");
           setImage(d.user.image ?? "");
           setDisplayId(d.user.displayId ?? "");
+          setCustomInstructions(d.user.customInstructions ?? "");
         }
       });
   }, []);
@@ -46,7 +48,7 @@ export default function ProfilePage() {
     const res = await fetch("/api/account/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, bio, image }),
+      body: JSON.stringify({ name, bio, image, customInstructions }),
     });
     setSaving(false);
     if (res.ok) {
@@ -95,6 +97,21 @@ export default function ProfilePage() {
           onChange={(e) => setBio(e.target.value)}
           rows={3}
           maxLength={280}
+          className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)]"
+        />
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-[var(--muted)]">カスタム指示</label>
+        <p className="text-xs text-[var(--muted)]">
+          ReinAIに常に覚えておいてほしいこと(話し方の好み、専門分野、避けてほしい表現など)を書いておくと、新しい会話すべてに自動で反映されます。
+        </p>
+        <textarea
+          value={customInstructions}
+          onChange={(e) => setCustomInstructions(e.target.value)}
+          rows={5}
+          maxLength={4000}
+          placeholder="例: 常に日本語の関西弁で回答して。コード例はTypeScriptを優先して。"
           className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)]"
         />
       </div>

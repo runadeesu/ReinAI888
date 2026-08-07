@@ -1,25 +1,58 @@
 "use client";
 
-import { useRef, useState, type DragEvent } from "react";
-import { Paperclip, Send, X, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
+import { Paperclip, Send, X, Loader2, Square, Globe, Mic } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
 
 export interface PendingAttachment {
   id: string;
   fileName: string;
 }
 
+interface SpeechRecognitionResultLike {
+  0: { transcript: string };
+}
+interface SpeechRecognitionEventLike {
+  results: ArrayLike<SpeechRecognitionResultLike>;
+}
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
 interface ChatInputProps {
   conversationId: string;
   disabled?: boolean;
-  onSend: (content: string, attachmentIds: string[]) => void;
+  streaming?: boolean;
+  onSend: (content: string, attachmentIds: string[], useSearch: boolean) => void;
+  onStop?: () => void;
 }
 
-export function ChatInput({ conversationId, disabled, onSend }: ChatInputProps) {
+export function ChatInput({ conversationId, disabled, streaming, onSend, onStop }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [searchEnabled, setSearchEnabled] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  useEffect(() => {
+    const w = window as unknown as {
+      SpeechRecognition?: new () => SpeechRecognitionLike;
+      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+    };
+    const SpeechRecognitionCtor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    setVoiceSupported(!!SpeechRecognitionCtor);
+  }, []);
 
   async function uploadFiles(files: FileList | File[]) {
     setUploading(true);
@@ -44,9 +77,41 @@ export function ChatInput({ conversationId, disabled, onSend }: ChatInputProps) 
 
   function handleSubmit() {
     if (!value.trim() && attachments.length === 0) return;
-    onSend(value.trim(), attachments.map((a) => a.id));
+    onSend(value.trim(), attachments.map((a) => a.id), searchEnabled);
     setValue("");
     setAttachments([]);
+  }
+
+  function toggleVoiceInput() {
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const w = window as unknown as {
+      SpeechRecognition?: new () => SpeechRecognitionLike;
+      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+    };
+    const SpeechRecognitionCtor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) return;
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "ja-JP";
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setValue(transcript);
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
   }
 
   return (
@@ -83,6 +148,28 @@ export function ChatInput({ conversationId, disabled, onSend }: ChatInputProps) 
         >
           {uploading ? <Loader2 size={18} className="animate-spin" /> : <Paperclip size={18} />}
         </button>
+        <button
+          onClick={() => setSearchEnabled((v) => !v)}
+          title="Wikipediaで調べてから回答する"
+          className={cn(
+            "shrink-0 rounded-lg p-2 hover:bg-[var(--surface-hover)]",
+            searchEnabled && "bg-[var(--primary)]/15 text-[var(--primary)]"
+          )}
+        >
+          <Globe size={18} />
+        </button>
+        {voiceSupported && (
+          <button
+            onClick={toggleVoiceInput}
+            title="音声入力"
+            className={cn(
+              "shrink-0 rounded-lg p-2 hover:bg-[var(--surface-hover)]",
+              listening && "animate-pulse bg-red-500/15 text-red-500"
+            )}
+          >
+            <Mic size={18} />
+          </button>
+        )}
         <input
           ref={fileInputRef}
           type="file"
@@ -103,13 +190,23 @@ export function ChatInput({ conversationId, disabled, onSend }: ChatInputProps) 
           placeholder="メッセージを入力... (Shift+Enterで改行)"
           className="max-h-40 min-h-[2.25rem] flex-1 resize-none bg-transparent py-1.5 text-sm outline-none"
         />
-        <button
-          onClick={handleSubmit}
-          disabled={disabled || (!value.trim() && attachments.length === 0)}
-          className="shrink-0 rounded-lg bg-[var(--primary)] p-2 text-white transition-colors hover:bg-[var(--primary-hover)] disabled:opacity-40"
-        >
-          <Send size={18} />
-        </button>
+        {streaming ? (
+          <button
+            onClick={onStop}
+            title="生成を停止"
+            className="shrink-0 rounded-lg bg-[var(--primary)] p-2 text-white transition-colors hover:bg-[var(--primary-hover)]"
+          >
+            <Square size={16} fill="currentColor" />
+          </button>
+        ) : (
+          <button
+            onClick={handleSubmit}
+            disabled={disabled || (!value.trim() && attachments.length === 0)}
+            className="shrink-0 rounded-lg bg-[var(--primary)] p-2 text-white transition-colors hover:bg-[var(--primary-hover)] disabled:opacity-40"
+          >
+            <Send size={18} />
+          </button>
+        )}
       </div>
     </div>
   );

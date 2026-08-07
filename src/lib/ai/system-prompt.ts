@@ -7,9 +7,10 @@ export const DEFAULT_SYSTEM_PROMPT = `あなたはReinAIです。ソフトウェ
 - 簡潔かつ実用的な回答を心がけてください。
 - 内容の検討・吟味は内部でしっかり行った上で、出力そのものは前置き・要約の繰り返し・冗長な言い換えを避け、結論や要点から簡潔に書き始めてください。考えた過程を長々と書き出す必要はありません。`;
 
-export function buildSystemPrompt(customPrompt?: string | null): string {
-  if (customPrompt && customPrompt.trim().length > 0) {
-    return customPrompt;
+export function buildSystemPrompt(customPrompt?: string | null, userInstructions?: string | null): string {
+  const base = customPrompt && customPrompt.trim().length > 0 ? customPrompt : DEFAULT_SYSTEM_PROMPT;
+  if (userInstructions && userInstructions.trim().length > 0) {
+    return `${base}\n\nユーザーの個人設定(常に考慮すること):\n${userInstructions.trim()}`;
   }
-  return DEFAULT_SYSTEM_PROMPT;
+  return base;
 }

@@ -42,6 +42,7 @@ export const updateProfileSchema = z.object({
   name: z.string().min(1).max(64).optional(),
   bio: z.string().max(280).optional(),
   image: z.string().url().optional().or(z.literal("")),
+  customInstructions: z.string().max(4000).optional().nullable(),
 });
 
 export const apiKeySchema = z.object({
@@ -66,9 +67,18 @@ export const conversationSchema = z.object({
   systemPrompt: z.string().optional().nullable(),
 });
 
-export const sendMessageSchema = z.object({
-  conversationId: z.string().min(1),
-  content: z.string().min(1),
-  attachmentIds: z.array(z.string()).optional(),
-  editMessageId: z.string().optional(),
-});
+export const sendMessageSchema = z
+  .object({
+    conversationId: z.string().min(1),
+    content: z.string().optional(),
+    attachmentIds: z.array(z.string()).optional(),
+    editMessageId: z.string().optional(),
+    useSearch: z.boolean().optional(),
+    // Regenerating re-runs the reply for the last user turn without adding
+    // new content; everything from this assistant message onward is dropped.
+    regenerateMessageId: z.string().optional(),
+  })
+  .refine((data) => data.regenerateMessageId || (data.content && data.content.trim().length > 0), {
+    message: "メッセージを入力してください",
+    path: ["content"],
+  });

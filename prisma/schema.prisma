@@ -30,6 +30,7 @@ model User {
   image             String?
   passwordHash      String? // null for OAuth-only accounts
   bio               String?
+  customInstructions String? // persisted personal preferences, prepended to the system prompt on new conversations
   twoFactorEnabled  Boolean   @default(false)
   twoFactorSecret   String? // encrypted TOTP secret
   createdAt         DateTime  @default(now())
@@ -178,6 +179,7 @@ model Conversation {
   isPinned      Boolean  @default(false)
   isFavorite    Boolean  @default(false)
   tags          String   @default("[]") // JSON-encoded string[]
+  shareId       String?  @unique // public read-only link id, null when not shared
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

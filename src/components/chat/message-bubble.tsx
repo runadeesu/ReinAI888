@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { User, Bot, Paperclip, Copy, Check, Pencil } from "lucide-react";
+import { User, Bot, Paperclip, Copy, Check, Pencil, RotateCw } from "lucide-react";
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 
 interface MessageBubbleProps {
@@ -11,6 +11,7 @@ interface MessageBubbleProps {
   attachments?: { id: string; fileName: string }[];
   pending?: boolean;
   onEdit?: (id: string, newContent: string) => void;
+  onRegenerate?: (id: string) => void;
   editDisabled?: boolean;
 }
 
@@ -21,6 +22,7 @@ export function MessageBubble({
   attachments,
   pending,
   onEdit,
+  onRegenerate,
   editDisabled,
 }: MessageBubbleProps) {
   const isUser = role === "user";
@@ -147,6 +149,28 @@ export function MessageBubble({
                     className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] disabled:opacity-40"
                   >
                     <Pencil size={13} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {!isUser && content && !pending && (
+              <div className="mt-1 flex items-center gap-1">
+                <button
+                  onClick={handleCopy}
+                  title="コピー"
+                  className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
+                >
+                  {copied ? <Check size={13} /> : <Copy size={13} />}
+                </button>
+                {onRegenerate && (
+                  <button
+                    onClick={() => onRegenerate(id)}
+                    disabled={editDisabled}
+                    title="再生成"
+                    className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] disabled:opacity-40"
+                  >
+                    <RotateCw size={13} />
                   </button>
                 )}
               </div>

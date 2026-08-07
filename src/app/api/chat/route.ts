@@ -1,9 +1,10 @@
-import { streamText, type ModelMessage } from "ai";
+import { streamText, stepCountIs, type ModelMessage } from "ai";
 import { prisma } from "@/lib/db/prisma";
 import { requireUserId } from "@/lib/auth/session";
 import { getLanguageModel } from "@/lib/ai/client";
 import { resolveApiKey } from "@/lib/ai/resolve-key";
 import { buildSystemPrompt } from "@/lib/ai/system-prompt";
+import { wikipediaSearchTool } from "@/lib/ai/tools/wikipedia-search";
 import type { AiProviderId } from "@/lib/ai/models";
 import { sendMessageSchema } from "@/lib/validation/schemas";
 import { rateLimit } from "@/lib/rate-limit/limiter";
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     return new Response(JSON.stringify({ error: "入力が正しくありません" }), { status: 400 });
   }
 
-  const { conversationId, content, attachmentIds, editMessageId } = parsed.data;
+  const { conversationId, content, attachmentIds, editMessageId, regenerateMessageId, useSearch } = parsed.data;
 
   const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
   if (!conversation || conversation.userId !== userId) {
@@ -49,9 +50,24 @@ export async function POST(request: Request) {
   }
 
   let priorMessages;
-  let userMessage;
+  let userMessage: { id: string } | null = null;
 
-  if (editMessageId) {
+  if (regenerateMessageId) {
+    const target = await prisma.message.findUnique({ where: { id: regenerateMessageId } });
+    if (!target || target.conversationId !== conversationId || target.role !== "assistant") {
+      return new Response(JSON.stringify({ error: "再生成対象のメッセージが見つかりません" }), { status: 404 });
+    }
+
+    priorMessages = await prisma.message.findMany({
+      where: { conversationId, createdAt: { lt: target.createdAt } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    // Regenerating drops the old reply and anything that came after it.
+    await prisma.message.deleteMany({
+      where: { conversationId, createdAt: { gte: target.createdAt } },
+    });
+  } else if (editMessageId) {
     const target = await prisma.message.findUnique({ where: { id: editMessageId } });
     if (!target || target.conversationId !== conversationId || target.role !== "user") {
       return new Response(JSON.stringify({ error: "編集対象のメッセージが見つかりません" }), { status: 404 });
@@ -69,7 +85,7 @@ export async function POST(request: Request) {
 
     userMessage = await prisma.message.update({
       where: { id: editMessageId },
-      data: { content },
+      data: { content: content! },
     });
   } else {
     priorMessages = await prisma.message.findMany({
@@ -81,7 +97,7 @@ export async function POST(request: Request) {
       data: {
         conversationId,
         role: "user",
-        content,
+        content: content!,
         ...(attachmentIds && attachmentIds.length > 0
           ? { attachments: { connect: attachmentIds.map((id) => ({ id })) } }
           : {}),
@@ -89,7 +105,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const isFirstMessage = priorMessages.length === 0;
+  const isFirstMessage = priorMessages.length === 0 && !regenerateMessageId;
 
   let attachmentContext = "";
   if (attachmentIds && attachmentIds.length > 0) {
@@ -103,22 +119,28 @@ export async function POST(request: Request) {
     }
   }
 
-  if (isFirstMessage) {
+  if (isFirstMessage && content) {
     const title = content.trim().slice(0, 60) || "New chat";
     await prisma.conversation.update({ where: { id: conversationId }, data: { title } });
   }
 
-  const modelMessages: ModelMessage[] = [
-    ...priorMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-    { role: "user" as const, content: content + attachmentContext },
-  ];
+  const historyMessages: ModelMessage[] = priorMessages.map((m) => ({
+    role: m.role as "user" | "assistant",
+    content: m.content,
+  }));
+  const modelMessages: ModelMessage[] = regenerateMessageId
+    ? historyMessages
+    : [...historyMessages, { role: "user" as const, content: content! + attachmentContext }];
 
   const model = getLanguageModel(provider, conversation.model, apiKey);
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { customInstructions: true } });
 
   const result = streamText({
     model,
-    system: buildSystemPrompt(conversation.systemPrompt),
+    system: buildSystemPrompt(conversation.systemPrompt, user?.customInstructions),
     messages: modelMessages,
+    ...(useSearch ? { tools: { search_wikipedia: wikipediaSearchTool }, stopWhen: stepCountIs(5) } : {}),
+    abortSignal: request.signal,
     onFinish: async ({ text, usage }) => {
       await prisma.message.create({
         data: {
@@ -152,12 +174,25 @@ export async function POST(request: Request) {
       try {
         for await (const chunk of result.textStream) {
           accumulated += chunk;
-          controller.enqueue(encoder.encode(chunk));
+          try {
+            controller.enqueue(encoder.encode(chunk));
+          } catch {
+            // client already disconnected; keep accumulating so the partial
+            // reply can still be persisted below.
+          }
         }
       } catch (err) {
-        console.error("[ReinAI chat stream aborted]", err);
-        const notice = "\n\n[エラー: 応答の生成中に問題が発生しました。もう一度お試しください]";
-        controller.enqueue(encoder.encode(notice));
+        // Client-initiated stop (via AbortController) surfaces here the same
+        // way a provider failure would — request.signal.aborted tells them
+        // apart so we only show an error notice for genuine failures.
+        const aborted = request.signal.aborted;
+        console.error(aborted ? "[ReinAI chat stream stopped by client]" : "[ReinAI chat stream error]", err);
+        const notice = aborted ? "" : "\n\n[エラー: 応答の生成中に問題が発生しました。もう一度お試しください]";
+        if (notice) {
+          try {
+            controller.enqueue(encoder.encode(notice));
+          } catch {}
+        }
         if (accumulated.trim().length > 0) {
           await prisma.message
             .create({
@@ -172,7 +207,9 @@ export async function POST(request: Request) {
             .catch(() => {});
         }
       } finally {
-        controller.close();
+        try {
+          controller.close();
+        } catch {}
       }
     },
   });
@@ -180,7 +217,7 @@ export async function POST(request: Request) {
   return new Response(stream, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
-      "X-User-Message-Id": userMessage.id,
+      ...(userMessage ? { "X-User-Message-Id": userMessage.id } : {}),
     },
   });
 }

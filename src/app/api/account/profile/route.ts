@@ -17,6 +17,7 @@ export async function GET() {
       email: true,
       displayId: true,
       twoFactorEnabled: true,
+      customInstructions: true,
       createdAt: true,
     },
   });
@@ -34,15 +35,16 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "入力が正しくありません" }, { status: 400 });
   }
 
-  const data: Record<string, string> = {};
+  const data: Record<string, string | null> = {};
   if (parsed.data.name !== undefined) data.name = parsed.data.name;
   if (parsed.data.bio !== undefined) data.bio = parsed.data.bio;
   if (parsed.data.image) data.image = parsed.data.image;
+  if (parsed.data.customInstructions !== undefined) data.customInstructions = parsed.data.customInstructions;
 
   const user = await prisma.user.update({
     where: { id: userId },
     data,
-    select: { id: true, name: true, bio: true, image: true, email: true, displayId: true },
+    select: { id: true, name: true, bio: true, image: true, email: true, displayId: true, customInstructions: true },
   });
 
   return NextResponse.json({ user });
