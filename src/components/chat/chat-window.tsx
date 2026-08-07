@@ -23,6 +23,7 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [shareCopied, setShareCopied] = useState(false);
+  const [imageGenerating, setImageGenerating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const handleSendRef = useRef<((content: string, attachmentIds: string[], useSearch: boolean) => void) | null>(
     null
@@ -153,6 +154,48 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
     await streamAssistantReply({ conversationId, content: newContent, editMessageId: messageId });
   }
 
+  async function handleGenerateImage(prompt: string) {
+    const optimisticId = `pending-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: optimisticId,
+        role: "user",
+        content: prompt,
+        provider: null,
+        model: null,
+        createdAt: new Date().toISOString(),
+        attachments: [],
+      },
+    ]);
+    setError(null);
+    setImageGenerating(true);
+
+    try {
+      const res = await fetch("/api/images/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId, prompt }),
+      });
+      const data = await res.json().catch(() => ({ error: "画像生成に失敗しました" }));
+
+      if (!res.ok) {
+        setError(data.error ?? "画像生成に失敗しました");
+        if (data.userMessageId) {
+          setMessages((prev) => prev.map((m) => (m.id === optimisticId ? { ...m, id: data.userMessageId } : m)));
+        }
+        return;
+      }
+
+      setMessages((prev) => [
+        ...prev.map((m) => (m.id === optimisticId ? { ...m, id: data.userMessageId } : m)),
+        data.assistantMessage,
+      ]);
+    } finally {
+      setImageGenerating(false);
+    }
+  }
+
   async function handleRegenerate(messageId: string) {
     const idx = messages.findIndex((m) => m.id === messageId);
     if (idx === -1) return;
@@ -252,6 +295,7 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
           {streamingText !== null && (
             <MessageBubble id="streaming" role="assistant" content={streamingText} pending />
           )}
+          {imageGenerating && <MessageBubble id="image-generating" role="assistant" content="" pending />}
           {error && (
             <p className="my-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-[var(--danger)]">{error}</p>
           )}
@@ -261,9 +305,10 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
       <div className="mx-auto w-full max-w-3xl">
         <ChatInput
           conversationId={conversationId}
-          disabled={streamingText !== null}
+          disabled={streamingText !== null || imageGenerating}
           streaming={streamingText !== null}
           onSend={handleSend}
+          onGenerateImage={handleGenerateImage}
           onStop={handleStop}
         />
       </div>

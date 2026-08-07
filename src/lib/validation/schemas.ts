@@ -82,3 +82,8 @@ export const sendMessageSchema = z
     message: "メッセージを入力してください",
     path: ["content"],
   });
+
+export const generateImageSchema = z.object({
+  conversationId: z.string().min(1),
+  prompt: z.string().min(1).max(2000),
+});
