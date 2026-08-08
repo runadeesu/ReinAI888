@@ -25,6 +25,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     "image/gif",
     "image/webp",
     "application/pdf",
+    "video/mp4",
   ]);
   const disposition = INLINE_SAFE_TYPES.has(attachment.mimeType) ? "inline" : "attachment";
 

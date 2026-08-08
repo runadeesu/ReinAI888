@@ -24,6 +24,7 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
   const [loading, setLoading] = useState(true);
   const [shareCopied, setShareCopied] = useState(false);
   const [imageGenerating, setImageGenerating] = useState(false);
+  const [videoGenerating, setVideoGenerating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const handleSendRef = useRef<((content: string, attachmentIds: string[], useSearch: boolean) => void) | null>(
     null
@@ -196,6 +197,72 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
     }
   }
 
+  async function handleGenerateVideo(prompt: string) {
+    const optimisticId = `pending-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: optimisticId,
+        role: "user",
+        content: prompt,
+        provider: null,
+        model: null,
+        createdAt: new Date().toISOString(),
+        attachments: [],
+      },
+    ]);
+    setError(null);
+    setVideoGenerating(true);
+
+    try {
+      const startRes = await fetch("/api/videos/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId, prompt }),
+      });
+      const startData = await startRes.json().catch(() => ({ error: "動画生成に失敗しました" }));
+
+      if (!startRes.ok) {
+        setError(startData.error ?? "動画生成に失敗しました");
+        if (startData.userMessageId) {
+          setMessages((prev) => prev.map((m) => (m.id === optimisticId ? { ...m, id: startData.userMessageId } : m)));
+        }
+        return;
+      }
+
+      setMessages((prev) => prev.map((m) => (m.id === optimisticId ? { ...m, id: startData.userMessageId } : m)));
+
+      const operationName = startData.operationName as string;
+      const maxAttempts = 40; // ~40 * 8s ≈ 5.3 minutes, Veo generation typically finishes well inside this
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 8000));
+
+        const statusRes = await fetch("/api/videos/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationId, operationName }),
+        });
+        const statusData = await statusRes.json().catch(() => ({ error: "動画生成の状態確認に失敗しました" }));
+
+        if (!statusRes.ok) {
+          setError(statusData.error ?? "動画生成の状態確認に失敗しました");
+          return;
+        }
+        if (statusData.done) {
+          if (statusData.error) {
+            setError(statusData.error);
+          } else if (statusData.assistantMessage) {
+            setMessages((prev) => [...prev, statusData.assistantMessage]);
+          }
+          return;
+        }
+      }
+      setError("動画生成がタイムアウトしました。もう一度お試しください。");
+    } finally {
+      setVideoGenerating(false);
+    }
+  }
+
   async function handleRegenerate(messageId: string) {
     const idx = messages.findIndex((m) => m.id === messageId);
     if (idx === -1) return;
@@ -296,6 +363,7 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
             <MessageBubble id="streaming" role="assistant" content={streamingText} pending />
           )}
           {imageGenerating && <MessageBubble id="image-generating" role="assistant" content="" pending />}
+          {videoGenerating && <MessageBubble id="video-generating" role="assistant" content="" pending />}
           {error && (
             <p className="my-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-[var(--danger)]">{error}</p>
           )}
@@ -305,10 +373,11 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
       <div className="mx-auto w-full max-w-3xl">
         <ChatInput
           conversationId={conversationId}
-          disabled={streamingText !== null || imageGenerating}
+          disabled={streamingText !== null || imageGenerating || videoGenerating}
           streaming={streamingText !== null}
           onSend={handleSend}
           onGenerateImage={handleGenerateImage}
+          onGenerateVideo={handleGenerateVideo}
           onStop={handleStop}
         />
       </div>

@@ -5,6 +5,7 @@ import { User, Bot, Paperclip, Copy, Check, Pencil, RotateCw } from "lucide-reac
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 
 const INLINE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+const INLINE_VIDEO_TYPES = new Set(["video/mp4"]);
 
 interface MessageBubbleProps {
   id: string;
@@ -80,24 +81,44 @@ export function MessageBubble({
           </div>
         )}
 
-        {attachments && attachments.some((a) => !a.mimeType || !INLINE_IMAGE_TYPES.has(a.mimeType)) && (
-          <div className="mb-1.5 flex flex-wrap gap-1.5">
+        {attachments && attachments.some((a) => a.mimeType && INLINE_VIDEO_TYPES.has(a.mimeType)) && (
+          <div className="mb-1.5 flex flex-wrap gap-2">
             {attachments
-              .filter((a) => !a.mimeType || !INLINE_IMAGE_TYPES.has(a.mimeType))
+              .filter((a) => a.mimeType && INLINE_VIDEO_TYPES.has(a.mimeType))
               .map((a) => (
-                <a
+                <video
                   key={a.id}
-                  href={`/api/attachments/${a.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs hover:bg-[var(--surface-hover)]"
-                >
-                  <Paperclip size={11} />
-                  {a.fileName}
-                </a>
+                  src={`/api/attachments/${a.id}`}
+                  controls
+                  className="max-h-80 max-w-full rounded-xl border border-[var(--border)]"
+                />
               ))}
           </div>
         )}
+
+        {attachments &&
+          attachments.some(
+            (a) => !a.mimeType || (!INLINE_IMAGE_TYPES.has(a.mimeType) && !INLINE_VIDEO_TYPES.has(a.mimeType))
+          ) && (
+            <div className="mb-1.5 flex flex-wrap gap-1.5">
+              {attachments
+                .filter(
+                  (a) => !a.mimeType || (!INLINE_IMAGE_TYPES.has(a.mimeType) && !INLINE_VIDEO_TYPES.has(a.mimeType))
+                )
+                .map((a) => (
+                  <a
+                    key={a.id}
+                    href={`/api/attachments/${a.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs hover:bg-[var(--surface-hover)]"
+                  >
+                    <Paperclip size={11} />
+                    {a.fileName}
+                  </a>
+                ))}
+            </div>
+          )}
 
         {editing ? (
           <div className="w-full min-w-[16rem]">

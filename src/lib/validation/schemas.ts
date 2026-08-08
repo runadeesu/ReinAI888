@@ -87,3 +87,13 @@ export const generateImageSchema = z.object({
   conversationId: z.string().min(1),
   prompt: z.string().min(1).max(2000),
 });
+
+export const generateVideoSchema = z.object({
+  conversationId: z.string().min(1),
+  prompt: z.string().min(1).max(2000),
+});
+
+export const videoStatusSchema = z.object({
+  conversationId: z.string().min(1),
+  operationName: z.string().min(1),
+});

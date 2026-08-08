@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type DragEvent } from "react";
-import { Paperclip, Send, X, Loader2, Square, Globe, Mic, Image as ImageIcon } from "lucide-react";
+import { Paperclip, Send, X, Loader2, Square, Globe, Mic, Image as ImageIcon, Video } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 export interface PendingAttachment {
@@ -32,16 +32,26 @@ interface ChatInputProps {
   streaming?: boolean;
   onSend: (content: string, attachmentIds: string[], useSearch: boolean) => void;
   onGenerateImage: (prompt: string) => void;
+  onGenerateVideo: (prompt: string) => void;
   onStop?: () => void;
 }
 
-export function ChatInput({ conversationId, disabled, streaming, onSend, onGenerateImage, onStop }: ChatInputProps) {
+export function ChatInput({
+  conversationId,
+  disabled,
+  streaming,
+  onSend,
+  onGenerateImage,
+  onGenerateVideo,
+  onStop,
+}: ChatInputProps) {
   const [value, setValue] = useState("");
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [imageGenEnabled, setImageGenEnabled] = useState(false);
+  const [videoGenEnabled, setVideoGenEnabled] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -81,6 +91,8 @@ export function ChatInput({ conversationId, disabled, streaming, onSend, onGener
     if (!value.trim() && attachments.length === 0) return;
     if (imageGenEnabled && value.trim()) {
       onGenerateImage(value.trim());
+    } else if (videoGenEnabled && value.trim()) {
+      onGenerateVideo(value.trim());
     } else {
       onSend(value.trim(), attachments.map((a) => a.id), searchEnabled);
     }
@@ -165,7 +177,10 @@ export function ChatInput({ conversationId, disabled, streaming, onSend, onGener
           <Globe size={18} />
         </button>
         <button
-          onClick={() => setImageGenEnabled((v) => !v)}
+          onClick={() => {
+            setImageGenEnabled((v) => !v);
+            setVideoGenEnabled(false);
+          }}
           title="画像を生成する"
           className={cn(
             "shrink-0 rounded-lg p-2 hover:bg-[var(--surface-hover)]",
@@ -173,6 +188,19 @@ export function ChatInput({ conversationId, disabled, streaming, onSend, onGener
           )}
         >
           <ImageIcon size={18} />
+        </button>
+        <button
+          onClick={() => {
+            setVideoGenEnabled((v) => !v);
+            setImageGenEnabled(false);
+          }}
+          title="動画を生成する(Google Veo)"
+          className={cn(
+            "shrink-0 rounded-lg p-2 hover:bg-[var(--surface-hover)]",
+            videoGenEnabled && "bg-[var(--primary)]/15 text-[var(--primary)]"
+          )}
+        >
+          <Video size={18} />
         </button>
         {voiceSupported && (
           <button
@@ -203,7 +231,13 @@ export function ChatInput({ conversationId, disabled, streaming, onSend, onGener
             }
           }}
           rows={1}
-          placeholder={imageGenEnabled ? "生成したい画像を説明してください..." : "メッセージを入力... (Shift+Enterで改行)"}
+          placeholder={
+            imageGenEnabled
+              ? "生成したい画像を説明してください..."
+              : videoGenEnabled
+                ? "生成したい動画を説明してください(数分かかります)..."
+                : "メッセージを入力... (Shift+Enterで改行)"
+          }
           className="max-h-40 min-h-[2.25rem] flex-1 resize-none bg-transparent py-1.5 text-sm outline-none"
         />
         {streaming ? (
