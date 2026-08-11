@@ -52,6 +52,7 @@ model User {
   emailChangeTokens   EmailChangeToken[]
   personas            Persona[]
   instructionVersions InstructionVersion[]
+  discordLink         DiscordLink?
 }
 
 // Named, switchable custom-instruction presets. Applying one overwrites
@@ -85,11 +86,41 @@ model InstructionVersion {
 
 // Admin-authored banner shown to every signed-in user until deactivated.
 // Written by the standalone reinai-admin site, read by the main app.
+// discordPostedAt lets the Discord bot poll for announcements it hasn't
+// relayed to the community server yet, without needing its own queue.
 model Announcement {
-  id        String   @id @default(cuid())
-  message   String
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id              String    @id @default(cuid())
+  message         String
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  discordPostedAt DateTime?
+}
+
+// One-time code issued by the Discord bot's /verify command, shown to the
+// member as a link into the web app. Consumed (deleted) as soon as the
+// logged-in user confirms the link, or once it expires.
+model DiscordVerificationCode {
+  code            String   @id @default(cuid())
+  discordId       String
+  discordUsername String
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+
+  @@index([discordId])
+}
+
+// Confirmed Discord <-> ReinAI account link. notifiedAt tracks whether the
+// bot has already picked this up and assigned the verified role, so its
+// poll loop doesn't reprocess the same link forever.
+model DiscordLink {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  discordId       String    @unique
+  discordUsername String
+  linkedAt        DateTime  @default(now())
+  notifiedAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Account {

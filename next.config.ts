@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   // deploy past Netlify's upload size limit with an 80MB+ .exe that had
   // nothing to do with the web app.
   outputFileTracingExcludes: {
-    "*": ["reinai-code/**", "reinai-admin/**"],
+    "*": ["reinai-code/**", "reinai-admin/**", "reinai-discord-bot/**"],
   },
 };
 

@@ -39,6 +39,7 @@
   "exclude": [
     "node_modules",
     "reinai-code",
-    "reinai-admin"
+    "reinai-admin",
+    "reinai-discord-bot"
   ]
 }
