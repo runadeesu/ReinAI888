@@ -96,6 +96,16 @@ model Announcement {
   discordPostedAt DateTime?
 }
 
+// Single-row global switch, toggled by the Discord admin bot's
+// /maintenance-on and /maintenance-off. Checked by the (app) layout on
+// every request to that route group.
+model SystemStatus {
+  id                  String   @id @default("singleton")
+  maintenanceMode     Boolean  @default(false)
+  maintenanceMessage  String?
+  updatedAt           DateTime @updatedAt
+}
+
 // One-time code issued by the Discord bot's /verify command, shown to the
 // member as a link into the web app. Consumed (deleted) as soon as the
 // logged-in user confirms the link, or once it expires.

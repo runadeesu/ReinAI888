@@ -9,10 +9,11 @@ export async function execute(interaction) {
   await interaction.deferReply({ ephemeral: true });
 
   try {
-    const { url, expiresInMinutes } = await startVerification(interaction.user.id, interaction.user.username);
+    const result = await startVerification(interaction.user.id, interaction.user.username);
+    if (result.error) throw new Error(result.error);
     await interaction.editReply(
       `以下のリンクをクリックして、ReinAIアカウントでログインした状態で連携を確認してください。\n` +
-        `このリンクは${expiresInMinutes}分間有効です。\n\n${url}`
+        `このリンクは${result.expiresInMinutes}分間有効です。\n\n${result.url}`
     );
   } catch (err) {
     console.error("[verify] failed to start verification:", err);

@@ -7,7 +7,9 @@ import { fetchNewlyLinked, ackLinked } from "../api.js";
 export function startVerificationPoller(client) {
   async function tick() {
     try {
-      const { links } = await fetchNewlyLinked();
+      const result = await fetchNewlyLinked();
+      if (result.error) throw new Error(result.error);
+      const { links } = result;
       if (links.length === 0) return;
 
       const guild = await client.guilds.fetch(config.guildId);

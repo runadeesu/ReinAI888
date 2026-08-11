@@ -9,7 +9,9 @@ import { fetchPendingAnnouncements, markAnnouncementPosted } from "../api.js";
 export function startAnnouncementPoller(client) {
   async function tick() {
     try {
-      const { announcements } = await fetchPendingAnnouncements();
+      const result = await fetchPendingAnnouncements();
+      if (result.error) throw new Error(result.error);
+      const { announcements } = result;
       if (announcements.length === 0) return;
 
       const channel = await client.channels.fetch(config.announcementChannelId);

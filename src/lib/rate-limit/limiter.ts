@@ -54,6 +54,16 @@ export function peekRateLimit(key: string, limit: number): RateLimitResult {
   return { success: existing.count < limit, remaining: Math.max(0, limit - existing.count), resetAt: existing.resetAt };
 }
 
+/**
+ * Clears a bucket outright. Only affects the serverless instance handling
+ * this request — under multi-instance deployments other warm instances
+ * keep their own counters until they naturally expire, so this is
+ * best-effort, not a guaranteed instant reset everywhere.
+ */
+export function resetRateLimit(key: string): void {
+  buckets.delete(key);
+}
+
 export function getClientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();

@@ -1,8 +1,22 @@
 import { REST, Routes } from "discord.js";
 import { config } from "./config.js";
 import * as verify from "./commands/verify.js";
+import { commands as userManagementCommands } from "./commands/admin/userManagement.js";
+import { commands as moderationCommands } from "./commands/admin/moderation.js";
+import { commands as contentCommands } from "./commands/admin/content.js";
+import { commands as securityCommands } from "./commands/admin/security.js";
+import { commands as utilityCommands, publicCommands } from "./commands/admin/utility.js";
 
-const commands = [verify.data.toJSON()];
+const allCommands = [
+  verify,
+  ...userManagementCommands,
+  ...moderationCommands,
+  ...contentCommands,
+  ...securityCommands,
+  ...utilityCommands,
+  ...publicCommands,
+];
+const commands = allCommands.map((c) => c.data.toJSON());
 const rest = new REST().setToken(config.botToken);
 
 try {
