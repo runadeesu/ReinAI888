@@ -1,13 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // reinai-code/ is a fully separate Electron project living inside this
-  // repo (see reinai-code/README.md) — without this, Next's output file
-  // tracer sweeps its node_modules/dist/release into the standalone build,
-  // which once blew the deploy past Netlify's upload size limit with an
-  // 80MB+ .exe that had nothing to do with the web app.
+  // reinai-code/ and reinai-admin/ are fully separate projects living inside
+  // this repo — without this, Next's output file tracer sweeps their
+  // node_modules/dist into the standalone build. reinai-code once blew the
+  // deploy past Netlify's upload size limit with an 80MB+ .exe that had
+  // nothing to do with the web app.
   outputFileTracingExcludes: {
-    "*": ["reinai-code/**"],
+    "*": ["reinai-code/**", "reinai-admin/**"],
   },
 };
 
