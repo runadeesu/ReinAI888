@@ -7,7 +7,19 @@ const patchSchema = z.object({
   name: z.string().min(1).max(80).optional(),
   description: z.string().max(500).optional(),
   color: z.string().max(20).optional(),
+  customInstructions: z.string().max(4000).optional().nullable(),
 });
+
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await requireUserId();
+  if (!userId) return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+
+  const { id } = await params;
+  const project = await prisma.project.findUnique({ where: { id } });
+  if (!project || project.userId !== userId) return NextResponse.json({ error: "見つかりません" }, { status: 404 });
+
+  return NextResponse.json({ project });
+}
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const userId = await requireUserId();

@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Monitor, Trash2 } from "lucide-react";
@@ -35,6 +36,7 @@ export default function AccountSettingsPage() {
       <TwoFactorSection />
       <SessionsSection />
       <LoginHistorySection />
+      <DeleteAccountSection />
     </div>
   );
 }
@@ -244,9 +246,22 @@ function SessionsSection() {
     load();
   }
 
+  async function handleRevokeAll() {
+    if (!confirm("現在のセッション以外のすべてのログインを終了しますか?")) return;
+    await fetch("/api/account/sessions/revoke-all", { method: "POST" });
+    load();
+  }
+
   return (
     <section>
-      <h3 className="mb-3 font-medium">ログイン中のセッション</h3>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-medium">ログイン中のセッション</h3>
+        {sessions.length > 1 && (
+          <Button size="sm" variant="secondary" onClick={handleRevokeAll}>
+            他のすべてを終了
+          </Button>
+        )}
+      </div>
       <div className="space-y-2">
         {sessions.map((s) => (
           <div key={s.id} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2">
@@ -296,6 +311,62 @@ function LoginHistorySection() {
           </div>
         ))}
         {history.length === 0 && <p className="text-sm text-[var(--muted)]">履歴がありません</p>}
+      </div>
+    </section>
+  );
+}
+
+function DeleteAccountSection() {
+  const [password, setPassword] = useState("");
+  const [confirmText, setConfirmText] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleDelete() {
+    if (confirmText !== "DELETE") {
+      setMessage('確認のため "DELETE" と入力してください');
+      return;
+    }
+    if (!confirm("本当にアカウントを削除しますか?この操作は取り消せません。すべての会話・設定が完全に削除されます。")) return;
+
+    setLoading(true);
+    setMessage(null);
+    const res = await fetch("/api/account/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    if (res.ok) {
+      await signOut({ callbackUrl: "/login" });
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setMessage(data.error ?? "削除に失敗しました");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-[var(--danger)]/30 p-4">
+      <h3 className="mb-1 font-medium text-[var(--danger)]">アカウントを削除</h3>
+      <p className="mb-3 text-xs text-[var(--muted)]">
+        すべての会話・メッセージ・プロンプト・APIキー設定が完全に削除され、元に戻せません。
+      </p>
+      <div className="space-y-2">
+        <Input
+          type="password"
+          placeholder="現在のパスワード (パスワード未設定の場合は空欄でOK)"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <Input
+          placeholder='確認のため "DELETE" と入力'
+          value={confirmText}
+          onChange={(e) => setConfirmText(e.target.value)}
+        />
+        {message && <p className="text-sm text-[var(--danger)]">{message}</p>}
+        <Button variant="danger" size="sm" onClick={handleDelete} disabled={loading || confirmText !== "DELETE"}>
+          {loading ? "削除中..." : "アカウントを完全に削除する"}
+        </Button>
       </div>
     </section>
   );

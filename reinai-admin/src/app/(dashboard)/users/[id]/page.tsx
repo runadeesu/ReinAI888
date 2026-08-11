@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { DeleteUserButton } from "./delete-user-button";
+import { SuspendUserButton } from "./suspend-user-button";
 
 export default async function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -16,6 +17,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
       bio: true,
       emailVerified: true,
       twoFactorEnabled: true,
+      isSuspended: true,
       customInstructions: true,
       createdAt: true,
       apiKeys: { select: { provider: true, label: true, lastFour: true, createdAt: true } },
@@ -50,12 +52,22 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         </Link>
         <div className="mt-2 flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-white">{user.email}</h2>
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+              {user.email}
+              {user.isSuspended && (
+                <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-300">
+                  停止中
+                </span>
+              )}
+            </h2>
             <p className="mt-0.5 text-sm text-white/50">
               {user.name ?? "名前未設定"} / {user.displayId}
             </p>
           </div>
-          <DeleteUserButton userId={user.id} email={user.email} />
+          <div className="flex shrink-0 gap-2">
+            <SuspendUserButton userId={user.id} isSuspended={user.isSuspended} />
+            <DeleteUserButton userId={user.id} email={user.email} />
+          </div>
         </div>
       </div>
 

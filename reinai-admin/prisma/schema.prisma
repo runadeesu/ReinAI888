@@ -31,6 +31,8 @@ model User {
   passwordHash      String? // null for OAuth-only accounts
   bio               String?
   customInstructions String? // persisted personal preferences, prepended to the system prompt on new conversations
+  favoriteModels    String    @default("[]") // JSON-encoded "provider:modelId"[], pinned to the top of the model selector
+  isSuspended       Boolean   @default(false) // set by reinai-admin; blocks credentials login while true
   twoFactorEnabled  Boolean   @default(false)
   twoFactorSecret   String? // encrypted TOTP secret
   createdAt         DateTime  @default(now())
@@ -48,6 +50,46 @@ model User {
   attachments       Attachment[]
   passwordResetTokens PasswordResetToken[]
   emailChangeTokens   EmailChangeToken[]
+  personas            Persona[]
+  instructionVersions InstructionVersion[]
+}
+
+// Named, switchable custom-instruction presets. Applying one overwrites
+// User.customInstructions rather than being live-linked, so the chat path
+// stays a single flat read with no extra join.
+model Persona {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  instructions String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Append-only history of User.customInstructions, written on every save so
+// a previous version can be restored.
+model InstructionVersion {
+  id        String   @id @default(cuid())
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Admin-authored banner shown to every signed-in user until deactivated.
+// Written by the standalone reinai-admin site, read by the main app.
+model Announcement {
+  id        String   @id @default(cuid())
+  message   String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
 }
 
 model Account {
@@ -130,14 +172,15 @@ model LoginHistory {
 // ---------------------------------------------------------------------------
 
 model Project {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String
-  description String?
-  color       String?
-  lastUsedAt  DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  userId             String
+  name               String
+  description        String?
+  color              String?
+  customInstructions String? // overrides the account-wide custom instructions for conversations in this project
+  lastUsedAt         DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversations Conversation[]
@@ -178,6 +221,7 @@ model Conversation {
   systemPrompt  String?
   isPinned      Boolean  @default(false)
   isFavorite    Boolean  @default(false)
+  isArchived    Boolean  @default(false)
   tags          String   @default("[]") // JSON-encoded string[]
   shareId       String?  @unique // public read-only link id, null when not shared
   createdAt     DateTime @default(now())
@@ -203,6 +247,8 @@ model Message {
   model          String?
   promptTokens   Int?
   completionTokens Int?
+  isPinned       Boolean  @default(false)
+  reactions      String   @default("[]") // JSON-encoded emoji string[]
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

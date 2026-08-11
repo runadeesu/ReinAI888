@@ -33,5 +33,7 @@ export interface MessageItem {
   provider: string | null;
   model: string | null;
   createdAt: string;
+  isPinned?: boolean;
+  reactions?: string[];
   attachments: { id: string; fileName: string; mimeType: string; sizeBytes: number }[];
 }

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 import { ReinAILogo } from "@/components/brand/logo";
+import { ForkButton } from "./fork-button";
 import { User, Bot, Paperclip } from "lucide-react";
 
 export default async function SharedConversationPage({ params }: { params: Promise<{ shareId: string }> }) {
@@ -27,8 +28,9 @@ export default async function SharedConversationPage({ params }: { params: Promi
 
   return (
     <div className="min-h-screen bg-[var(--surface)]">
-      <div className="border-b border-[var(--border)] bg-[var(--background)] px-4 py-3">
+      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--background)] px-4 py-3">
         <ReinAILogo size={20} />
+        <ForkButton shareId={shareId} />
       </div>
       <div className="mx-auto max-w-3xl px-4 py-8">
         <h1 className="mb-6 text-xl font-semibold">{conversation.title}</h1>

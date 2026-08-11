@@ -40,6 +40,9 @@ class TotpRequiredError extends CredentialsSignin {
 class InvalidTotpError extends CredentialsSignin {
   code = "INVALID_TOTP";
 }
+class AccountSuspendedError extends CredentialsSignin {
+  code = "ACCOUNT_SUSPENDED";
+}
 
 const baseAdapter = PrismaAdapter(prisma);
 
@@ -96,6 +99,10 @@ const authConfig: NextAuthConfig = {
 
         if (!user.emailVerified) {
           throw new EmailNotVerifiedError();
+        }
+
+        if (user.isSuspended) {
+          throw new AccountSuspendedError();
         }
 
         if (user.twoFactorEnabled) {
@@ -164,9 +171,12 @@ const authConfig: NextAuthConfig = {
       }
 
       if (token.sid) {
-        const dbSession = await prisma.session.findUnique({ where: { id: token.sid as string } });
-        if (!dbSession || dbSession.expires < new Date()) {
-          // Session was revoked or expired server-side.
+        const dbSession = await prisma.session.findUnique({
+          where: { id: token.sid as string },
+          include: { user: { select: { isSuspended: true } } },
+        });
+        if (!dbSession || dbSession.expires < new Date() || dbSession.user.isSuspended) {
+          // Session was revoked/expired, or the account was suspended after sign-in.
           return { ...session, user: undefined, expires: session.expires };
         }
         if (dbSession.lastSeenAt.getTime() < Date.now() - 5 * 60 * 1000) {

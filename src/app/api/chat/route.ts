@@ -1,4 +1,4 @@
-import { streamText, stepCountIs, type ModelMessage } from "ai";
+import { streamText, generateText, stepCountIs, type ModelMessage } from "ai";
 import { prisma } from "@/lib/db/prisma";
 import { requireUserId } from "@/lib/auth/session";
 import { getLanguageModel } from "@/lib/ai/client";
@@ -119,9 +119,23 @@ export async function POST(request: Request) {
     }
   }
 
+  const model = getLanguageModel(provider, conversation.model, apiKey);
+
   if (isFirstMessage && content) {
     const title = content.trim().slice(0, 60) || "New chat";
     await prisma.conversation.update({ where: { id: conversationId }, data: { title } });
+
+    // Best-effort upgrade to a real summary title once the model responds —
+    // fire-and-forget so it never delays the user's first reply.
+    generateText({
+      model,
+      prompt: `次のメッセージの内容を表す、10〜20文字程度の短いタイトルを1行だけ日本語で出力してください。タイトル以外の説明・記号・引用符は付けないでください。\n\nメッセージ:\n${content.slice(0, 2000)}`,
+    })
+      .then(({ text }) => {
+        const better = text.trim().replace(/^["'「』]|["'」』]$/g, "").slice(0, 60);
+        if (better) return prisma.conversation.update({ where: { id: conversationId }, data: { title: better } });
+      })
+      .catch(() => {});
   }
 
   const historyMessages: ModelMessage[] = priorMessages.map((m) => ({
@@ -132,12 +146,20 @@ export async function POST(request: Request) {
     ? historyMessages
     : [...historyMessages, { role: "user" as const, content: content! + attachmentContext }];
 
-  const model = getLanguageModel(provider, conversation.model, apiKey);
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { customInstructions: true } });
+  const [user, project] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { customInstructions: true } }),
+    conversation.projectId
+      ? prisma.project.findUnique({ where: { id: conversation.projectId }, select: { customInstructions: true } })
+      : Promise.resolve(null),
+  ]);
+  const effectiveInstructions =
+    project?.customInstructions && project.customInstructions.trim().length > 0
+      ? project.customInstructions
+      : user?.customInstructions;
 
   const result = streamText({
     model,
-    system: buildSystemPrompt(conversation.systemPrompt, user?.customInstructions),
+    system: buildSystemPrompt(conversation.systemPrompt, effectiveInstructions),
     messages: modelMessages,
     ...(useSearch ? { tools: { search_wikipedia: wikipediaSearchTool }, stopWhen: stepCountIs(5) } : {}),
     abortSignal: request.signal,

@@ -24,6 +24,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       displayId: true,
       emailVerified: true,
       twoFactorEnabled: true,
+      isSuspended: true,
       createdAt: true,
       _count: { select: { conversations: true, apiKeys: true } },
     },
@@ -70,6 +71,11 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                   <Link href={`/users/${u.id}`} className="text-white/90 hover:underline">
                     {u.email}
                   </Link>
+                  {u.isSuspended && (
+                    <span className="ml-2 rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                      停止中
+                    </span>
+                  )}
                 </td>
                 <td className="px-3 py-2 text-white/70">{u.name ?? "—"}</td>
                 <td className="px-3 py-2 text-white/70">{u._count.conversations}</td>

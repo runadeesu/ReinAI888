@@ -1,9 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Star, Trash2, Download, Upload, Copy, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Star, Trash2, Download, Upload, Copy, X, MessageSquarePlus, BookMarked } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+const VAR_PATTERN = /\{\{\s*([a-zA-Z0-9_.\-ぁ-んァ-ヶ一-龠]+)\s*\}\}/g;
+
+function extractVariables(content: string): string[] {
+  const names = new Set<string>();
+  for (const match of content.matchAll(VAR_PATTERN)) {
+    names.add(match[1]);
+  }
+  return [...names];
+}
+
+function fillVariables(content: string, values: Record<string, string>): string {
+  return content.replace(VAR_PATTERN, (_, name) => (values[name] ?? "").trim() || `{{${name}}}`);
+}
 
 interface Category {
   id: string;
@@ -20,11 +35,13 @@ interface Prompt {
 }
 
 export default function PromptsPage() {
+  const router = useRouter();
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [editing, setEditing] = useState<Prompt | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [usingPrompt, setUsingPrompt] = useState<Prompt | null>(null);
 
   async function load() {
     const params = new URLSearchParams();
@@ -55,6 +72,28 @@ export default function PromptsPage() {
       body: JSON.stringify({ isFavorite: !p.isFavorite }),
     });
     load();
+  }
+
+  async function startChatWithContent(content: string) {
+    const provider = localStorage.getItem("reinai-last-provider") || undefined;
+    const model = localStorage.getItem("reinai-last-model") || undefined;
+    const res = await fetch("/api/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider, model }),
+    });
+    const data = await res.json();
+    const conversationId = data.conversation.id;
+    sessionStorage.setItem(`reinai-draft-${conversationId}`, content);
+    router.push(`/chat/${conversationId}`);
+  }
+
+  function handleUse(p: Prompt) {
+    if (extractVariables(p.content).length > 0) {
+      setUsingPrompt(p);
+    } else {
+      startChatWithContent(p.content);
+    }
   }
 
   async function handleExport() {
@@ -136,7 +175,10 @@ export default function PromptsPage() {
                   </button>
                 </div>
                 <p className="mt-1 line-clamp-3 text-xs text-[var(--muted)]">{p.content}</p>
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" onClick={() => handleUse(p)}>
+                    <MessageSquarePlus size={12} /> 使用
+                  </Button>
                   <Button
                     size="sm"
                     variant="secondary"
@@ -161,7 +203,13 @@ export default function PromptsPage() {
               </div>
             ))}
           </div>
-          {prompts.length === 0 && <p className="text-sm text-[var(--muted)]">プロンプトはまだありません</p>}
+          {prompts.length === 0 && (
+            <div className="flex flex-col items-center gap-2 py-16 text-center">
+              <BookMarked size={28} className="text-[var(--muted)]" />
+              <p className="text-sm text-[var(--muted)]">プロンプトはまだありません</p>
+              <p className="text-xs text-[var(--muted)]">「新規作成」からよく使うプロンプトを保存しましょう</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -176,6 +224,64 @@ export default function PromptsPage() {
           }}
         />
       )}
+
+      {usingPrompt && (
+        <VariableFillModal
+          prompt={usingPrompt}
+          onClose={() => setUsingPrompt(null)}
+          onSubmit={(filled) => {
+            setUsingPrompt(null);
+            startChatWithContent(filled);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function VariableFillModal({
+  prompt,
+  onClose,
+  onSubmit,
+}: {
+  prompt: Prompt;
+  onClose: () => void;
+  onSubmit: (filled: string) => void;
+}) {
+  const variables = extractVariables(prompt.content);
+  const [values, setValues] = useState<Record<string, string>>(
+    Object.fromEntries(variables.map((v) => [v, ""]))
+  );
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--background)] p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-semibold">変数を入力 — {prompt.title}</h2>
+          <button onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="max-h-80 space-y-3 overflow-y-auto">
+          {variables.map((v) => (
+            <div key={v} className="space-y-1">
+              <label className="text-xs font-medium text-[var(--muted)]">{v}</label>
+              <Input
+                autoFocus={variables[0] === v}
+                value={values[v] ?? ""}
+                onChange={(e) => setValues((prev) => ({ ...prev, [v]: e.target.value }))}
+                placeholder={`{{${v}}}`}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            キャンセル
+          </Button>
+          <Button onClick={() => onSubmit(fillVariables(prompt.content, values))}>チャットで使用</Button>
+        </div>
+      </div>
     </div>
   );
 }

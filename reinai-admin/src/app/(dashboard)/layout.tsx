@@ -5,6 +5,7 @@ const NAV = [
   { href: "/", label: "ダッシュボード" },
   { href: "/users", label: "ユーザー" },
   { href: "/providers", label: "プロバイダー" },
+  { href: "/announcements", label: "お知らせ" },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

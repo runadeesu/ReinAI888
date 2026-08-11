@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { User, Bot, Paperclip, Copy, Check, Pencil, RotateCw } from "lucide-react";
+import { User, Bot, Paperclip, Copy, Check, Pencil, RotateCw, Pin, SmilePlus } from "lucide-react";
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
+import { cn } from "@/lib/utils/cn";
 
 const INLINE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 const INLINE_VIDEO_TYPES = new Set(["video/mp4"]);
+const REACTION_CHOICES = ["👍", "👎", "❤️", "😄", "🎉", "🤔"];
 
 interface MessageBubbleProps {
   id: string;
@@ -13,8 +15,13 @@ interface MessageBubbleProps {
   content: string;
   attachments?: { id: string; fileName: string; mimeType?: string }[];
   pending?: boolean;
+  isPinned?: boolean;
+  reactions?: string[];
+  highlighted?: boolean;
   onEdit?: (id: string, newContent: string) => void;
   onRegenerate?: (id: string) => void;
+  onTogglePin?: (id: string) => void;
+  onToggleReaction?: (id: string, emoji: string) => void;
   editDisabled?: boolean;
 }
 
@@ -24,14 +31,20 @@ export function MessageBubble({
   content,
   attachments,
   pending,
+  isPinned,
+  reactions,
+  highlighted,
   onEdit,
   onRegenerate,
+  onTogglePin,
+  onToggleReaction,
   editDisabled,
 }: MessageBubbleProps) {
   const isUser = role === "user";
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(content);
   const [copied, setCopied] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   async function handleCopy() {
     await navigator.clipboard.writeText(content);
@@ -54,8 +67,94 @@ export function MessageBubble({
     setEditing(false);
   }
 
+  const actionButtons = !editing && content && !pending && (
+    <div className="mt-1 flex items-center gap-1">
+      <button
+        onClick={handleCopy}
+        title="コピー"
+        className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
+      >
+        {copied ? <Check size={13} /> : <Copy size={13} />}
+      </button>
+      {isUser && onEdit && (
+        <button
+          onClick={handleEditStart}
+          disabled={editDisabled}
+          title="編集"
+          className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] disabled:opacity-40"
+        >
+          <Pencil size={13} />
+        </button>
+      )}
+      {!isUser && onRegenerate && (
+        <button
+          onClick={() => onRegenerate(id)}
+          disabled={editDisabled}
+          title="再生成"
+          className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] disabled:opacity-40"
+        >
+          <RotateCw size={13} />
+        </button>
+      )}
+      {onTogglePin && (
+        <button
+          onClick={() => onTogglePin(id)}
+          title={isPinned ? "ピン留めを解除" : "ピン留め"}
+          className={cn(
+            "rounded-lg p-1 hover:bg-[var(--surface-hover)]",
+            isPinned ? "text-[var(--primary)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"
+          )}
+        >
+          <Pin size={13} fill={isPinned ? "currentColor" : "none"} />
+        </button>
+      )}
+      {onToggleReaction && (
+        <div className="relative">
+          <button
+            onClick={() => setPickerOpen((v) => !v)}
+            title="リアクション"
+            className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
+          >
+            <SmilePlus size={13} />
+          </button>
+          {pickerOpen && (
+            <div
+              className={cn(
+                "absolute top-full z-10 mt-1 flex gap-0.5 rounded-xl border border-[var(--border)] bg-[var(--background)] p-1 shadow-lg",
+                isUser ? "right-0" : "left-0"
+              )}
+            >
+              {REACTION_CHOICES.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => {
+                    onToggleReaction(id, emoji);
+                    setPickerOpen(false);
+                  }}
+                  className={cn(
+                    "rounded-lg p-1.5 text-sm hover:bg-[var(--surface-hover)]",
+                    reactions?.includes(emoji) && "bg-[var(--surface-hover)]"
+                  )}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className={`group flex gap-3 py-4 ${isUser ? "flex-row-reverse" : ""}`}>
+    <div
+      id={`message-${id}`}
+      className={cn(
+        "group flex gap-3 rounded-xl py-4 transition-colors",
+        isUser ? "flex-row-reverse" : "",
+        highlighted && "bg-[var(--primary)]/10 ring-1 ring-[var(--primary)]/40"
+      )}
+    >
       <div
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
           isUser ? "bg-[var(--primary)] text-white" : "bg-[var(--surface)] border border-[var(--border)]"
@@ -154,69 +253,53 @@ export function MessageBubble({
           </div>
         ) : (
           <>
-            <div
-              className={`rounded-2xl px-4 py-2.5 text-sm ${
-                isUser ? "bg-[var(--primary)] text-white" : "bg-[var(--surface)] border border-[var(--border)]"
-              }`}
-            >
-              {content ? (
-                isUser ? (
-                  <p className="whitespace-pre-wrap">{content}</p>
-                ) : (
-                  <MarkdownRenderer content={content} />
-                )
-              ) : pending ? (
-                <span className="inline-flex gap-1">
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
-                </span>
-              ) : null}
+            <div className="relative">
+              {isPinned && (
+                <Pin
+                  size={11}
+                  fill="currentColor"
+                  className={cn(
+                    "absolute -top-1.5 text-[var(--primary)]",
+                    isUser ? "-left-1.5 -scale-x-100" : "-right-1.5"
+                  )}
+                />
+              )}
+              <div
+                className={`rounded-2xl px-4 py-2.5 text-sm ${
+                  isUser ? "bg-[var(--primary)] text-white" : "bg-[var(--surface)] border border-[var(--border)]"
+                }`}
+              >
+                {content ? (
+                  isUser ? (
+                    <p className="whitespace-pre-wrap">{content}</p>
+                  ) : (
+                    <MarkdownRenderer content={content} />
+                  )
+                ) : pending ? (
+                  <span className="inline-flex gap-1">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
+                  </span>
+                ) : null}
+              </div>
             </div>
 
-            {isUser && content && !pending && (
-              <div className="mt-1 flex items-center gap-1">
-                <button
-                  onClick={handleCopy}
-                  title="コピー"
-                  className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
-                >
-                  {copied ? <Check size={13} /> : <Copy size={13} />}
-                </button>
-                {onEdit && (
+            {reactions && reactions.length > 0 && (
+              <div className={`mt-1 flex flex-wrap gap-1 ${isUser ? "justify-end" : "justify-start"}`}>
+                {reactions.map((emoji) => (
                   <button
-                    onClick={handleEditStart}
-                    disabled={editDisabled}
-                    title="編集"
-                    className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] disabled:opacity-40"
+                    key={emoji}
+                    onClick={() => onToggleReaction?.(id, emoji)}
+                    className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-xs hover:bg-[var(--surface-hover)]"
                   >
-                    <Pencil size={13} />
+                    {emoji}
                   </button>
-                )}
+                ))}
               </div>
             )}
 
-            {!isUser && content && !pending && (
-              <div className="mt-1 flex items-center gap-1">
-                <button
-                  onClick={handleCopy}
-                  title="コピー"
-                  className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
-                >
-                  {copied ? <Check size={13} /> : <Copy size={13} />}
-                </button>
-                {onRegenerate && (
-                  <button
-                    onClick={() => onRegenerate(id)}
-                    disabled={editDisabled}
-                    title="再生成"
-                    className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] disabled:opacity-40"
-                  >
-                    <RotateCw size={13} />
-                  </button>
-                )}
-              </div>
-            )}
+            {actionButtons}
           </>
         )}
       </div>

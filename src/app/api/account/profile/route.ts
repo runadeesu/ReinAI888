@@ -39,7 +39,14 @@ export async function PATCH(request: Request) {
   if (parsed.data.name !== undefined) data.name = parsed.data.name;
   if (parsed.data.bio !== undefined) data.bio = parsed.data.bio;
   if (parsed.data.image) data.image = parsed.data.image;
-  if (parsed.data.customInstructions !== undefined) data.customInstructions = parsed.data.customInstructions;
+
+  if (parsed.data.customInstructions !== undefined) {
+    const existing = await prisma.user.findUnique({ where: { id: userId }, select: { customInstructions: true } });
+    if (existing?.customInstructions && existing.customInstructions !== parsed.data.customInstructions) {
+      await prisma.instructionVersion.create({ data: { userId, content: existing.customInstructions } });
+    }
+    data.customInstructions = parsed.data.customInstructions;
+  }
 
   const user = await prisma.user.update({
     where: { id: userId },

@@ -15,10 +15,12 @@ export async function GET(request: Request) {
   const folderId = url.searchParams.get("folderId");
   const pinned = url.searchParams.get("pinned");
   const favorite = url.searchParams.get("favorite");
+  const archived = url.searchParams.get("archived");
 
   const conversations = await prisma.conversation.findMany({
     where: {
       userId,
+      isArchived: archived === "true",
       ...(search ? { title: { contains: search } } : {}),
       ...(projectId ? { projectId } : {}),
       ...(folderId ? { folderId } : {}),
@@ -33,6 +35,7 @@ export async function GET(request: Request) {
       model: true,
       isPinned: true,
       isFavorite: true,
+      isArchived: true,
       tags: true,
       projectId: true,
       folderId: true,

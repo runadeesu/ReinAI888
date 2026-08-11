@@ -18,5 +18,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     include: { attachments: { select: { id: true, fileName: true, mimeType: true, sizeBytes: true } } },
   });
 
-  return NextResponse.json({ messages });
+  return NextResponse.json({
+    messages: messages.map((m) => ({ ...m, reactions: JSON.parse(m.reactions) })),
+  });
 }

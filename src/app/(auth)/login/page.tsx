@@ -12,6 +12,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   EMAIL_NOT_VERIFIED: "メールアドレスが確認されていません。受信箱をご確認ください。",
   TOTP_REQUIRED: "2段階認証コードを入力してください",
   INVALID_TOTP: "認証コードが正しくありません",
+  ACCOUNT_SUSPENDED: "このアカウントは停止されています。詳細はサポートにお問い合わせください。",
   CredentialsSignin: "メールアドレスまたはパスワードが正しくありません",
 };
 

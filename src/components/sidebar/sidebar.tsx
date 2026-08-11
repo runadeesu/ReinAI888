@@ -19,12 +19,15 @@ import {
   Trash2,
   BookMarked,
   X,
+  Tag,
+  LayoutGrid,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { useSidebar } from "@/components/sidebar/sidebar-context";
 import { ReinAILogo } from "@/components/brand/logo";
 import type { ConversationSummary, FolderItem, ProjectItem } from "@/types/api";
 import { cn } from "@/lib/utils/cn";
+import { tagColor } from "@/lib/utils/tag-color";
 
 export function Sidebar() {
   const router = useRouter();
@@ -99,6 +102,15 @@ export function Sidebar() {
     if (pathname === `/chat/${id}`) router.push("/chat");
   }
 
+  async function handleUpdateTags(id: string, tags: string[]) {
+    await fetch(`/api/conversations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tags }),
+    });
+    loadConversations(search, activeProjectId);
+  }
+
   const pinned = conversations.filter((c) => c.isPinned);
   const others = conversations.filter((c) => !c.isPinned);
 
@@ -151,6 +163,16 @@ export function Sidebar() {
 
       <nav className="mt-3 px-3">
         <Link
+          href="/conversations"
+          className={cn(
+            "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--surface-hover)]",
+            pathname === "/conversations" && "bg-[var(--surface-hover)] font-medium"
+          )}
+        >
+          <LayoutGrid size={15} />
+          すべての会話
+        </Link>
+        <Link
           href="/prompts"
           className={cn(
             "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--surface-hover)]",
@@ -176,17 +198,28 @@ export function Sidebar() {
               すべて
             </button>
             {projects.map((p) => (
-              <button
+              <div
                 key={p.id}
-                onClick={() => setActiveProjectId(p.id)}
                 className={cn(
-                  "flex w-full items-center gap-2 truncate rounded-lg px-2 py-1.5 text-left text-sm hover:bg-[var(--surface-hover)]",
+                  "group/proj flex items-center rounded-lg hover:bg-[var(--surface-hover)]",
                   activeProjectId === p.id && "bg-[var(--surface-hover)]"
                 )}
               >
-                <FolderClosed size={14} />
-                {p.name}
-              </button>
+                <button
+                  onClick={() => setActiveProjectId(p.id)}
+                  className="flex min-w-0 flex-1 items-center gap-2 truncate px-2 py-1.5 text-left text-sm"
+                >
+                  <FolderClosed size={14} />
+                  <span className="truncate">{p.name}</span>
+                </button>
+                <Link
+                  href={`/projects/${p.id}`}
+                  title="プロジェクト設定"
+                  className="mr-1 shrink-0 rounded p-1 opacity-0 hover:bg-[var(--border)] group-hover/proj:opacity-100"
+                >
+                  <Settings size={12} />
+                </Link>
+              </div>
             ))}
           </div>
         </div>
@@ -218,6 +251,7 @@ export function Sidebar() {
               onTogglePin={handleTogglePin}
               onToggleFavorite={handleToggleFavorite}
               onDelete={handleDelete}
+              onUpdateTags={handleUpdateTags}
             />
           </div>
         )}
@@ -229,6 +263,7 @@ export function Sidebar() {
             onTogglePin={handleTogglePin}
             onToggleFavorite={handleToggleFavorite}
             onDelete={handleDelete}
+            onUpdateTags={handleUpdateTags}
           />
         </div>
       </div>
@@ -265,44 +300,146 @@ function ConversationList({
   onTogglePin,
   onToggleFavorite,
   onDelete,
+  onUpdateTags,
 }: {
   items: ConversationSummary[];
   pathname: string | null;
   onTogglePin: (id: string, current: boolean) => void;
   onToggleFavorite: (id: string, current: boolean) => void;
   onDelete: (id: string) => void;
+  onUpdateTags: (id: string, tags: string[]) => void;
 }) {
+  const [tagEditorId, setTagEditorId] = useState<string | null>(null);
+
   if (items.length === 0) {
-    return <p className="px-2 py-2 text-xs text-[var(--muted)]">チャットはまだありません</p>;
+    return (
+      <div className="flex flex-col items-center gap-1.5 px-2 py-6 text-center">
+        <MessageSquare size={20} className="text-[var(--muted)]" />
+        <p className="text-xs text-[var(--muted)]">チャットはまだありません</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-0.5">
-      {items.map((c) => (
-        <div
-          key={c.id}
-          className={cn(
-            "group flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-[var(--surface-hover)]",
-            pathname === `/chat/${c.id}` && "bg-[var(--surface-hover)]"
-          )}
-        >
-          <MessageSquare size={14} className="shrink-0 text-[var(--muted)]" />
-          <Link href={`/chat/${c.id}`} className="min-w-0 flex-1 truncate text-sm">
-            {c.title}
-          </Link>
-          <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
-            <button onClick={() => onToggleFavorite(c.id, c.isFavorite)} className="rounded p-1 hover:bg-[var(--border)]">
-              <Star size={12} className={c.isFavorite ? "fill-current text-yellow-500" : ""} />
-            </button>
-            <button onClick={() => onTogglePin(c.id, c.isPinned)} className="rounded p-1 hover:bg-[var(--border)]">
-              <Pin size={12} className={c.isPinned ? "fill-current" : ""} />
-            </button>
-            <button onClick={() => onDelete(c.id)} className="rounded p-1 hover:bg-[var(--border)]">
-              <Trash2 size={12} />
-            </button>
+      {items.map((c) => {
+        const tags: string[] = JSON.parse(c.tags || "[]");
+        return (
+          <div key={c.id} className="relative">
+            <div
+              className={cn(
+                "group flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-[var(--surface-hover)]",
+                pathname === `/chat/${c.id}` && "bg-[var(--surface-hover)]"
+              )}
+            >
+              <MessageSquare size={14} className="shrink-0 text-[var(--muted)]" />
+              <div className="min-w-0 flex-1">
+                <Link href={`/chat/${c.id}`} className="block truncate text-sm">
+                  {c.title}
+                </Link>
+                {tags.length > 0 && (
+                  <div className="mt-0.5 flex flex-wrap gap-1">
+                    {tags.map((t) => {
+                      const color = tagColor(t);
+                      return (
+                        <span
+                          key={t}
+                          className="rounded px-1.5 py-0 text-[10px] leading-4"
+                          style={{ background: color.bg, color: color.fg }}
+                        >
+                          {t}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                <button
+                  onClick={() => setTagEditorId(tagEditorId === c.id ? null : c.id)}
+                  className="rounded p-1 hover:bg-[var(--border)]"
+                  title="タグを編集"
+                >
+                  <Tag size={12} className={tags.length > 0 ? "fill-current" : ""} />
+                </button>
+                <button onClick={() => onToggleFavorite(c.id, c.isFavorite)} className="rounded p-1 hover:bg-[var(--border)]">
+                  <Star size={12} className={c.isFavorite ? "fill-current text-yellow-500" : ""} />
+                </button>
+                <button onClick={() => onTogglePin(c.id, c.isPinned)} className="rounded p-1 hover:bg-[var(--border)]">
+                  <Pin size={12} className={c.isPinned ? "fill-current" : ""} />
+                </button>
+                <button onClick={() => onDelete(c.id)} className="rounded p-1 hover:bg-[var(--border)]">
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            </div>
+            {tagEditorId === c.id && (
+              <TagEditor
+                tags={tags}
+                onSave={(next) => {
+                  onUpdateTags(c.id, next);
+                  setTagEditorId(null);
+                }}
+                onClose={() => setTagEditorId(null)}
+              />
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
+    </div>
+  );
+}
+
+function TagEditor({
+  tags,
+  onSave,
+  onClose,
+}: {
+  tags: string[];
+  onSave: (tags: string[]) => void;
+  onClose: () => void;
+}) {
+  const [value, setValue] = useState(tags.join(", "));
+
+  return (
+    <div className="absolute left-2 right-2 top-full z-10 mt-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 shadow-lg">
+      <input
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            onSave(
+              value
+                .split(",")
+                .map((t) => t.trim())
+                .filter(Boolean)
+            );
+          } else if (e.key === "Escape") {
+            onClose();
+          }
+        }}
+        placeholder="タグをカンマ区切りで入力"
+        className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs outline-none focus:border-[var(--primary)]"
+      />
+      <div className="mt-1.5 flex justify-end gap-1">
+        <button onClick={onClose} className="rounded px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--surface-hover)]">
+          キャンセル
+        </button>
+        <button
+          onClick={() =>
+            onSave(
+              value
+                .split(",")
+                .map((t) => t.trim())
+                .filter(Boolean)
+            )
+          }
+          className="rounded bg-[var(--primary)] px-2 py-1 text-xs text-white hover:bg-[var(--primary-hover)]"
+        >
+          保存
+        </button>
+      </div>
     </div>
   );
 }

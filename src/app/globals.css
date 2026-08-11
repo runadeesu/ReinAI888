@@ -28,6 +28,28 @@
   --danger: #f87171;
 }
 
+.high-contrast {
+  --border: #8a8a94;
+  --muted: #40404a;
+}
+.dark.high-contrast {
+  --border: #6a6a76;
+  --muted: #d4d4dc;
+}
+
+html[data-font-size="sm"] {
+  font-size: 14px;
+}
+html[data-font-size="md"] {
+  font-size: 16px;
+}
+html[data-font-size="lg"] {
+  font-size: 18px;
+}
+html[data-font-size="xl"] {
+  font-size: 20px;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

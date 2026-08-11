@@ -7,6 +7,7 @@ import { z } from "zod";
 const patchSchema = conversationSchema.partial().extend({
   isPinned: z.boolean().optional(),
   isFavorite: z.boolean().optional(),
+  isArchived: z.boolean().optional(),
   tags: z.array(z.string()).optional(),
 });
 

@@ -2,9 +2,11 @@ import Link from "next/link";
 
 const NAV = [
   { href: "/settings/profile", label: "プロフィール" },
+  { href: "/settings/personas", label: "ペルソナ・指示履歴" },
   { href: "/settings/account", label: "アカウント・セキュリティ" },
   { href: "/settings/api-keys", label: "APIキー" },
   { href: "/settings/appearance", label: "外観" },
+  { href: "/settings/stats", label: "利用統計" },
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {

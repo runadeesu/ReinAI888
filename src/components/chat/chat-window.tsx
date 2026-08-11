@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Share2, Download, Check } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Share2, Download, Check, Search, Archive, X, ChevronUp, ChevronDown, Pin } from "lucide-react";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { ChatInput } from "@/components/chat/chat-input";
 import { ModelSelector } from "@/components/chat/model-selector";
@@ -25,6 +25,11 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
   const [shareCopied, setShareCopied] = useState(false);
   const [imageGenerating, setImageGenerating] = useState(false);
   const [videoGenerating, setVideoGenerating] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [matchIndex, setMatchIndex] = useState(0);
+  const [pinnedListOpen, setPinnedListOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const handleSendRef = useRef<((content: string, attachmentIds: string[], useSearch: boolean) => void) | null>(
     null
@@ -48,7 +53,43 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
         handleSendRef.current?.(draft, [], false);
       }
     });
+    setSearchOpen(false);
+    setSearchQuery("");
   }, [conversationId]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        setSearchOpen(true);
+        requestAnimationFrame(() => searchInputRef.current?.focus());
+      }
+      if (e.key === "Escape") {
+        setSearchOpen(false);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const searchMatches = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.trim().toLowerCase();
+    return messages.filter((m) => m.content.toLowerCase().includes(q)).map((m) => m.id);
+  }, [messages, searchQuery]);
+
+  useEffect(() => {
+    setMatchIndex(0);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const id = searchMatches[matchIndex];
+    if (id) {
+      document.getElementById(`message-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [matchIndex, searchMatches]);
+
+  const pinnedMessages = useMemo(() => messages.filter((m) => m.isPinned), [messages]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -270,6 +311,48 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
     await streamAssistantReply({ conversationId, regenerateMessageId: messageId });
   }
 
+  async function handleTogglePin(messageId: string) {
+    const target = messages.find((m) => m.id === messageId);
+    if (!target) return;
+    const nextPinned = !target.isPinned;
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, isPinned: nextPinned } : m)));
+    await fetch(`/api/messages/${messageId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isPinned: nextPinned }),
+    });
+  }
+
+  async function handleToggleReaction(messageId: string, emoji: string) {
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        const current = m.reactions ?? [];
+        const next = current.includes(emoji) ? current.filter((e) => e !== emoji) : [...current, emoji];
+        return { ...m, reactions: next };
+      })
+    );
+    await fetch(`/api/messages/${messageId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toggleReaction: emoji }),
+    });
+  }
+
+  async function handleArchive() {
+    await fetch(`/api/conversations/${conversationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isArchived: true }),
+    });
+    window.location.href = "/chat";
+  }
+
+  function jumpToMessage(messageId: string) {
+    document.getElementById(`message-${messageId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setPinnedListOpen(false);
+  }
+
   async function handleModelChange(provider: AiProviderId, model: string) {
     setConversation((prev) => (prev ? { ...prev, provider, model } : prev));
     localStorage.setItem("reinai-last-provider", provider);
@@ -325,6 +408,48 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
       <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
         <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{conversation?.title}</h2>
         <div className="flex shrink-0 items-center gap-1.5">
+          {pinnedMessages.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setPinnedListOpen((v) => !v)}
+                title="ピン留めされたメッセージ"
+                className="flex items-center gap-1 rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
+              >
+                <Pin size={16} />
+                <span className="text-xs">{pinnedMessages.length}</span>
+              </button>
+              {pinnedListOpen && (
+                <div className="absolute right-0 top-full z-20 mt-1 w-72 max-w-[90vw] rounded-xl border border-[var(--border)] bg-[var(--background)] p-2 shadow-lg">
+                  {pinnedMessages.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => jumpToMessage(m.id)}
+                      className="block w-full truncate rounded-lg px-2 py-1.5 text-left text-xs hover:bg-[var(--surface-hover)]"
+                    >
+                      {m.content.slice(0, 80) || "(添付ファイル)"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <button
+            onClick={() => {
+              setSearchOpen((v) => !v);
+              requestAnimationFrame(() => searchInputRef.current?.focus());
+            }}
+            title="会話内を検索 (Ctrl/Cmd+F)"
+            className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
+          >
+            <Search size={16} />
+          </button>
+          <button
+            onClick={handleArchive}
+            title="アーカイブ"
+            className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
+          >
+            <Archive size={16} />
+          </button>
           <button
             onClick={handleExport}
             title="Markdownでエクスポート"
@@ -345,6 +470,53 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
         </div>
       </div>
 
+      {searchOpen && (
+        <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2">
+          <Search size={14} className="text-[var(--muted)]" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                setMatchIndex((i) => (searchMatches.length ? (i + 1) % searchMatches.length : 0));
+              }
+            }}
+            placeholder="この会話内を検索..."
+            className="flex-1 bg-transparent text-sm outline-none"
+          />
+          {searchQuery && (
+            <span className="shrink-0 text-xs text-[var(--muted)]">
+              {searchMatches.length > 0 ? `${matchIndex + 1} / ${searchMatches.length}` : "0件"}
+            </span>
+          )}
+          <button
+            disabled={searchMatches.length === 0}
+            onClick={() => setMatchIndex((i) => (i - 1 + searchMatches.length) % searchMatches.length)}
+            className="rounded p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] disabled:opacity-30"
+          >
+            <ChevronUp size={14} />
+          </button>
+          <button
+            disabled={searchMatches.length === 0}
+            onClick={() => setMatchIndex((i) => (i + 1) % searchMatches.length)}
+            className="rounded p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] disabled:opacity-30"
+          >
+            <ChevronDown size={14} />
+          </button>
+          <button
+            onClick={() => {
+              setSearchOpen(false);
+              setSearchQuery("");
+            }}
+            className="rounded p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)]"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4">
         <div className="mx-auto max-w-3xl">
           {messages.map((m) => (
@@ -354,8 +526,13 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
               role={m.role}
               content={m.content}
               attachments={m.attachments}
+              isPinned={m.isPinned}
+              reactions={m.reactions}
+              highlighted={searchMatches[matchIndex] === m.id}
               onEdit={m.role === "user" ? handleEditMessage : undefined}
               onRegenerate={m.role === "assistant" ? handleRegenerate : undefined}
+              onTogglePin={handleTogglePin}
+              onToggleReaction={handleToggleReaction}
               editDisabled={streamingText !== null || m.id.startsWith("pending-")}
             />
           ))}

@@ -1,7 +1,10 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
+import rehypeKatex from "rehype-katex";
 import { CodeBlock } from "@/components/chat/code-block";
+import { MermaidDiagram } from "@/components/chat/mermaid-diagram";
 import type { ReactNode } from "react";
 
 function flattenText(node: ReactNode): string {
@@ -18,12 +21,15 @@ export function MarkdownRenderer({ content }: { content: string }) {
   return (
     <div className="markdown-body">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeHighlight, rehypeKatex]}
         components={{
           code(props) {
             const { className, children } = props;
             const match = /language-(\w+)/.exec(className ?? "");
+            if (match?.[1] === "mermaid") {
+              return <MermaidDiagram code={flattenText(children).replace(/\n$/, "")} />;
+            }
             if (match) {
               return <CodeBlock language={match[1]} code={flattenText(children).replace(/\n$/, "")} />;
             }

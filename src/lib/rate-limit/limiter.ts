@@ -41,6 +41,19 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
   return { success: true, remaining: limit - existing.count, resetAt: existing.resetAt };
 }
 
+/**
+ * Reads a bucket's current state without consuming a request from it.
+ * Used to show the caller how much of their quota remains.
+ */
+export function peekRateLimit(key: string, limit: number): RateLimitResult {
+  const now = Date.now();
+  const existing = buckets.get(key);
+  if (!existing || existing.resetAt < now) {
+    return { success: true, remaining: limit, resetAt: now };
+  }
+  return { success: existing.count < limit, remaining: Math.max(0, limit - existing.count), resetAt: existing.resetAt };
+}
+
 export function getClientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
