@@ -19,7 +19,6 @@ import {
   Trash2,
   BookMarked,
   X,
-  Shield,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { useSidebar } from "@/components/sidebar/sidebar-context";
@@ -243,11 +242,6 @@ export function Sidebar() {
             <p className="truncate text-sm font-medium">{session?.user?.name}</p>
             <p className="truncate text-xs text-[var(--muted)]">{session?.user?.email}</p>
           </div>
-          {session?.user?.email === "admin@reinai.local" && (
-            <Link href="/admin" className="rounded-lg p-1.5 hover:bg-[var(--surface-hover)]" title="管理画面">
-              <Shield size={16} />
-            </Link>
-          )}
           <Link href="/settings/profile" className="rounded-lg p-1.5 hover:bg-[var(--surface-hover)]" title="設定">
             <Settings size={16} />
           </Link>
