@@ -32,4 +32,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-client.login(config.botToken);
+client.on(Events.Error, (err) => {
+  console.error("[bot] client error:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("[bot] unhandled rejection:", err);
+});
+
+client.login(config.botToken).catch((err) => {
+  console.error("[bot] failed to connect to Discord's Gateway:", err.message);
+  console.error(
+    "If this is 'Unexpected server response: 403', it usually means the network you're running on " +
+      "(a proxy, VPN, or some cloud/datacenter IP ranges) is being rejected by Discord's Gateway edge. " +
+      "REST calls (used by /verify and the pollers once connected) can still work over such networks — " +
+      "only the persistent Gateway WebSocket is affected. Try running from a different network/host."
+  );
+  process.exit(1);
+});
