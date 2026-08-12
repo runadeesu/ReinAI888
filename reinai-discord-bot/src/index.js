@@ -63,6 +63,37 @@ client.once(Events.ClientReady, (c) => {
   registerVoiceLog(client);
 });
 
+// Without these, a dropped Gateway connection (router restart, ISP hiccup,
+// laptop sleep/wake) can go completely silent: the process stays alive and
+// "npm start" shows nothing new, but Discord marks the bot offline because
+// discord.js's own auto-reconnect got stuck. Log every shard lifecycle
+// event so that's visible, and if a disconnect doesn't resolve within 2
+// minutes, exit so a process manager (pm2, Docker, etc.) restarts us into a
+// clean connection rather than staying wedged forever.
+let disconnectWatchdog = null;
+
+client.on(Events.ShardDisconnect, (event, shardId) => {
+  console.warn(`[bot] shard ${shardId} disconnected (code ${event.code}) — waiting for reconnect...`);
+  clearTimeout(disconnectWatchdog);
+  disconnectWatchdog = setTimeout(() => {
+    console.error("[bot] shard did not reconnect within 2 minutes — exiting so the process can be restarted");
+    process.exit(1);
+  }, 2 * 60 * 1000).unref();
+});
+
+client.on(Events.ShardReconnecting, (shardId) => {
+  console.log(`[bot] shard ${shardId} reconnecting...`);
+});
+
+client.on(Events.ShardResume, (shardId) => {
+  console.log(`[bot] shard ${shardId} resumed`);
+  clearTimeout(disconnectWatchdog);
+});
+
+client.on(Events.ShardError, (err, shardId) => {
+  console.error(`[bot] shard ${shardId} error:`, err.message);
+});
+
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {
     const command = commands.get(interaction.commandName);
