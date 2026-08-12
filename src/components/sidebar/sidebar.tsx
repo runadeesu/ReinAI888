@@ -21,6 +21,7 @@ import {
   X,
   Tag,
   LayoutGrid,
+  MessageCircle,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { useSidebar } from "@/components/sidebar/sidebar-context";
@@ -182,6 +183,15 @@ export function Sidebar() {
           <BookMarked size={15} />
           プロンプト
         </Link>
+        <a
+          href={process.env.NEXT_PUBLIC_REINCHAT_URL ?? "https://reinchat.vercel.app"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--surface-hover)]"
+        >
+          <MessageCircle size={15} />
+          REINChatを使う
+        </a>
       </nav>
 
       {projects.length > 0 && (

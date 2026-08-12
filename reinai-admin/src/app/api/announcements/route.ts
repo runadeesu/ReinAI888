@@ -14,5 +14,21 @@ export async function POST(request: Request) {
   }
 
   const announcement = await prisma.announcement.create({ data: { message } });
+  relayToReinChat(message);
+
   return NextResponse.json({ announcement });
+}
+
+// Fire-and-forget: also posts to REINChat so its users see the same
+// announcement. Best-effort — a relay failure doesn't block creation here.
+function relayToReinChat(message: string) {
+  const reinchatUrl = process.env.REINCHAT_URL;
+  const secret = process.env.REINCHAT_SHARED_SECRET;
+  if (!reinchatUrl || !secret) return;
+
+  fetch(`${reinchatUrl.replace(/\/$/, "")}/api/announcements/relay`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-ReinChat-Secret": secret },
+    body: JSON.stringify({ message }),
+  }).catch(() => {});
 }

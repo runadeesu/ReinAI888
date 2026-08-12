@@ -23,6 +23,7 @@ export default async function DashboardPage() {
     newUsersToday,
     newUsersThisWeek,
     discordLinkedUsers,
+    reinChatLinkedUsers,
     conversationsByProvider,
     recentUsers,
   ] = await Promise.all([
@@ -33,6 +34,7 @@ export default async function DashboardPage() {
     prisma.user.count({ where: { createdAt: { gte: startOfToday } } }),
     prisma.user.count({ where: { createdAt: { gte: startOfWeek } } }),
     prisma.discordLink.count(),
+    prisma.reinChatLink.count(),
     prisma.conversation.groupBy({ by: ["provider"], _count: { _all: true }, orderBy: { _count: { provider: "desc" } } }),
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
@@ -56,6 +58,7 @@ export default async function DashboardPage() {
         <StatCard label="今日の新規登録" value={newUsersToday} />
         <StatCard label="今週の新規登録" value={newUsersThisWeek} />
         <StatCard label="Discord連携ユーザー数" value={discordLinkedUsers} />
+        <StatCard label="REINChat連携ユーザー数" value={reinChatLinkedUsers} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

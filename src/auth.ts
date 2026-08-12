@@ -43,6 +43,9 @@ class InvalidTotpError extends CredentialsSignin {
 class AccountSuspendedError extends CredentialsSignin {
   code = "ACCOUNT_SUSPENDED";
 }
+class InvalidLinkTokenError extends CredentialsSignin {
+  code = "INVALID_LINK_TOKEN";
+}
 
 const baseAdapter = PrismaAdapter(prisma);
 
@@ -121,6 +124,31 @@ const authConfig: NextAuthConfig = {
           email: user.email,
           image: user.image,
         };
+      },
+    }),
+    // Consumes a one-time token minted by /api/reinchat-link/mint-sso when a
+    // user who already linked their REINChat account clicks "ReinAIを開く"
+    // from REINChat. The token is single-use and expires in 60s — it proves
+    // "REINChat's server just vouched for this ReinAI user", nothing more.
+    Credentials({
+      id: "reinchat-token",
+      name: "REINChat Link",
+      credentials: { token: { label: "Token", type: "text" } },
+      async authorize(credentials) {
+        const token = credentials?.token as string | undefined;
+        if (!token) throw new InvalidLinkTokenError();
+
+        const record = await prisma.verificationToken.findUnique({ where: { token } });
+        if (!record || record.expires < new Date() || !record.identifier.startsWith("reinchat-sso:")) {
+          throw new InvalidLinkTokenError();
+        }
+        await prisma.verificationToken.delete({ where: { token } }).catch(() => {});
+
+        const userId = record.identifier.slice("reinchat-sso:".length);
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user || user.isSuspended) throw new InvalidLinkTokenError();
+
+        return { id: user.id, name: user.name, email: user.email, image: user.image };
       },
     }),
   ],

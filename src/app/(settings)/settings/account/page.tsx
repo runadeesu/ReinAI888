@@ -34,6 +34,9 @@ export default function AccountSettingsPage() {
         <ChangeEmailSection />
       </Suspense>
       <TwoFactorSection />
+      <Suspense>
+        <ReinChatLinkSection />
+      </Suspense>
       <SessionsSection />
       <LoginHistorySection />
       <DeleteAccountSection />
@@ -223,6 +226,59 @@ function TwoFactorSection() {
         <Button size="sm" variant="secondary" onClick={handleStartSetup}>
           2段階認証を設定する
         </Button>
+      )}
+    </section>
+  );
+}
+
+function ReinChatLinkSection() {
+  const searchParams = useSearchParams();
+  const [status, setStatus] = useState<{ linked: boolean; reinchatDisplayId: string | null } | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  function load() {
+    fetch("/api/reinchat-link/status")
+      .then((r) => r.json())
+      .then((d) => setStatus({ linked: Boolean(d.linked), reinchatDisplayId: d.reinchatDisplayId ?? null }));
+  }
+
+  useEffect(load, []);
+
+  useEffect(() => {
+    const reinchatError = searchParams.get("reinchat");
+    if (reinchatError === "not_linked") setMessage("先にREINChat連携を行ってください");
+    if (reinchatError === "sso_failed") setMessage("REINChatへのログインに失敗しました");
+    if (reinchatError === "not_configured") setMessage("REINChat連携が設定されていません");
+  }, [searchParams]);
+
+  async function handleUnlink() {
+    if (!confirm("REINChat連携を解除しますか?")) return;
+    await fetch("/api/reinchat-link/unlink", { method: "POST" });
+    load();
+  }
+
+  return (
+    <section>
+      <h3 className="mb-3 font-medium">REINChat連携</h3>
+      {message && <p className="mb-2 text-sm text-[var(--muted)]">{message}</p>}
+      {status?.linked ? (
+        <div className="space-y-3">
+          <p className="text-sm text-green-600 dark:text-green-400">連携済み(@{status.reinchatDisplayId})</p>
+          <div className="flex gap-2">
+            <a href="/api/reinchat-link/sso">
+              <Button size="sm">REINChatを開く</Button>
+            </a>
+            <Button size="sm" variant="secondary" onClick={handleUnlink}>
+              連携を解除
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <a href="/api/reinchat-link/start">
+          <Button size="sm" variant="secondary">
+            REINChatと連携する
+          </Button>
+        </a>
       )}
     </section>
   );

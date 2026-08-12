@@ -53,6 +53,7 @@ model User {
   personas            Persona[]
   instructionVersions InstructionVersion[]
   discordLink         DiscordLink?
+  reinChatLink        ReinChatLink?
 }
 
 // Named, switchable custom-instruction presets. Applying one overwrites
@@ -129,6 +130,31 @@ model DiscordLink {
   discordUsername String
   linkedAt        DateTime  @default(now())
   notifiedAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// One-time code minted by ReinAI (session-authenticated) when a user starts
+// linking a REINChat account. The user is sent to REINChat with this code;
+// REINChat's server confirms it back to ReinAI (shared-secret authenticated,
+// since REINChat itself owns that user's session, not ReinAI).
+model ReinChatVerificationCode {
+  code      String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([userId])
+}
+
+// Confirmed ReinAI <-> REINChat account link.
+model ReinChatLink {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  reinchatUserId    String   @unique
+  reinchatEmail     String
+  reinchatDisplayId String
+  linkedAt          DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
