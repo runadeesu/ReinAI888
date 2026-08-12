@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Events } from "discord.js";
+import { Client, GatewayIntentBits, Events, Partials } from "discord.js";
 import { config } from "./config.js";
 import * as verify from "./commands/verify.js";
 import { commands as userManagementCommands } from "./commands/admin/userManagement.js";
@@ -6,10 +6,17 @@ import { commands as moderationCommands } from "./commands/admin/moderation.js";
 import { commands as contentCommands } from "./commands/admin/content.js";
 import { commands as securityCommands } from "./commands/admin/security.js";
 import { commands as utilityCommands, publicCommands } from "./commands/admin/utility.js";
+import { commands as reminderCommands } from "./commands/admin/reminders.js";
+import { commands as noteCommands } from "./commands/admin/notes.js";
+import { commands as voiceCommands } from "./commands/admin/voice.js";
+import { commands as roleCommands } from "./commands/admin/roles.js";
 import { startVerificationPoller } from "./pollers/verification.js";
 import { startAnnouncementPoller } from "./pollers/announcements.js";
 import { startSchedulerPoller } from "./pollers/scheduler.js";
 import { registerSecretCheck } from "./events/secretCheck.js";
+import { registerMemberLog } from "./events/memberLog.js";
+import { registerMessageLog } from "./events/messageLog.js";
+import { registerVoiceLog } from "./events/voiceLog.js";
 import { takePendingAction } from "./pendingActions.js";
 import { adminDeleteUser } from "./api.js";
 import { isAdmin } from "./adminGuard.js";
@@ -24,6 +31,10 @@ const allCommands = [
   ...securityCommands,
   ...utilityCommands,
   ...publicCommands,
+  ...reminderCommands,
+  ...noteCommands,
+  ...voiceCommands,
+  ...roleCommands,
 ];
 const commands = new Map(allCommands.map((c) => [c.data.name, c]));
 
@@ -33,7 +44,12 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates,
   ],
+  // MessageDelete/MessageUpdate fire for uncached messages too (e.g. after a
+  // restart) when partials are enabled — otherwise discord.js silently
+  // drops them instead of emitting a partial Message we can still log.
+  partials: [Partials.Message, Partials.Channel],
 });
 
 client.once(Events.ClientReady, (c) => {
@@ -42,6 +58,9 @@ client.once(Events.ClientReady, (c) => {
   startAnnouncementPoller(client);
   startSchedulerPoller(client);
   registerSecretCheck(client);
+  registerMemberLog(client);
+  registerMessageLog(client);
+  registerVoiceLog(client);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

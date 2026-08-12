@@ -6,6 +6,10 @@ import { commands as moderationCommands } from "./commands/admin/moderation.js";
 import { commands as contentCommands } from "./commands/admin/content.js";
 import { commands as securityCommands } from "./commands/admin/security.js";
 import { commands as utilityCommands, publicCommands } from "./commands/admin/utility.js";
+import { commands as reminderCommands } from "./commands/admin/reminders.js";
+import { commands as noteCommands } from "./commands/admin/notes.js";
+import { commands as voiceCommands } from "./commands/admin/voice.js";
+import { commands as roleCommands } from "./commands/admin/roles.js";
 
 const allCommands = [
   verify,
@@ -15,6 +19,10 @@ const allCommands = [
   ...securityCommands,
   ...utilityCommands,
   ...publicCommands,
+  ...reminderCommands,
+  ...noteCommands,
+  ...voiceCommands,
+  ...roleCommands,
 ];
 const commands = allCommands.map((c) => c.data.toJSON());
 const rest = new REST().setToken(config.botToken);

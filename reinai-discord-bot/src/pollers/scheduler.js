@@ -10,6 +10,7 @@ export function startSchedulerPoller(client) {
   async function tick() {
     await processTempBans(client).catch((err) => console.error("[scheduler] temp-ban check failed:", err.message));
     await processScheduledAnnouncements(client).catch((err) => console.error("[scheduler] scheduled announcement check failed:", err.message));
+    await processReminders(client).catch((err) => console.error("[scheduler] reminder check failed:", err.message));
   }
 
   tick();
@@ -54,5 +55,27 @@ async function processScheduledAnnouncements(client) {
 
   await updateCollection("scheduled-announcements", (list) =>
     list.map((s) => (due.some((d) => d.id === s.id) ? { ...s, posted: true } : s))
+  );
+}
+
+async function processReminders(client) {
+  const reminders = await listRecords("reminders");
+  const due = reminders.filter((r) => !r.posted && new Date(r.dueAt).getTime() <= Date.now());
+  if (due.length === 0) return;
+
+  for (const item of due) {
+    try {
+      const channel = await client.channels.fetch(item.channelId);
+      const mention = item.mentionId ? `<@${item.mentionId}> ` : "";
+      const embed = new EmbedBuilder().setTitle("⏰ リマインダー").setDescription(item.message).setColor(0x1e90ff).setTimestamp(new Date());
+      await channel.send({ content: mention || undefined, embeds: [embed] });
+      console.log(`[scheduler] posted reminder ${item.id}`);
+    } catch (err) {
+      console.error(`[scheduler] failed to post reminder ${item.id}:`, err.message);
+    }
+  }
+
+  await updateCollection("reminders", (list) =>
+    list.map((r) => (due.some((d) => d.id === r.id) ? { ...r, posted: true } : r))
   );
 }

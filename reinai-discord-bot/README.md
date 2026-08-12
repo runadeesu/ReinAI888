@@ -24,7 +24,9 @@ ReinAI公式コミュニティサーバー用のbotです。3つの機能を持�
 「OAuth2」→「URL Generator」で以下を選択して生成されたURLを開き、自分のサーバーに招待してください。
 
 - **SCOPES**: `bot`, `applications.commands`
-- **BOT PERMISSIONS**: `Manage Roles`, `Send Messages`, `Embed Links`, `View Channels`, `Manage Messages`, `Kick Members`, `Ban Members`, `Moderate Members`, `Manage Channels`, `Manage Events`, `Manage Server`
+- **BOT PERMISSIONS**: `Manage Roles`, `Send Messages`, `Embed Links`, `View Channels`, `Manage Messages`, `Kick Members`, `Ban Members`, `Moderate Members`, `Manage Channels`, `Manage Events`, `Manage Server`, `Move Members`, `Mute Members`, `View Audit Log`
+
+既にサーバーに招待済みの場合は、上記の権限(特に`Move Members`/`Mute Members`/`View Audit Log`)を含めて招待URLを再生成し、同じサーバーで再認証してください(ロールの再付与などは発生しません)。
 
 招待後、サーバー設定 → ロール で、botのロールを **付与/操作したいロールより上** に配置してください(Discordの権限階層上、botは自分より下位のロールしか操作できません)。
 
@@ -36,6 +38,8 @@ Discordの「ユーザー設定」→「詳細設定」→ **開発者モード*
 - 認証済みユーザーに付与したいロールを右クリック → 「ロールIDをコピー」→ `DISCORD_VERIFIED_ROLE_ID`
 - お知らせを流したいチャンネルを右クリック → 「チャンネルIDをコピー」→ `DISCORD_ANNOUNCEMENT_CHANNEL_ID`
 - 管理者コマンドを実行できるロール(例: 「Rein管理者」)を右クリック → 「ロールIDをコピー」→ `DISCORD_ADMIN_ROLE_ID`
+- 入退室ログを流したいチャンネルを右クリック → 「チャンネルIDをコピー」→ `DISCORD_JOIN_LOG_CHANNEL_ID`
+- メッセージ編集/削除ログ・ボイスチャンネルログを流したいチャンネルを右クリック → 「チャンネルIDをコピー」→ `DISCORD_LOG_CHANNEL_ID`
 
 ### 4. .env を作成
 
@@ -71,9 +75,14 @@ npm start                    # bot起動
 - お知らせも同様に、`/api/discord/announcements/pending` をポーリングして未転送のお知らせを検出・投稿します。
 - 管理者コマンドは、`/api/discord/admin/*` の各エンドポイント(すべて`X-Bot-Secret`で認証)を呼び出して実データを操作します。Discordのモデレーション系コマンド(BAN/ミュート/チャンネルロック等)はDiscord API自体を直接操作するので、ReinAI側の呼び出しは発生しません。
 - 削除・大量キック・一斉DMなど取り消せない操作は、実行前にボタンでの確認を挟みます(5分で失効)。
-- FAQ・警告履歴・カスタムコマンド・予約投稿・コンテスト状態など、ReinAI本体に存在しない「このDiscordサーバー固有のデータ」は `data/` フォルダ内のJSONファイルにbotが自前で保存します(gitには含まれません)。
+- FAQ・警告履歴・カスタムコマンド・予約投稿・コンテスト状態・リマインダー・内部メモなど、ReinAI本体に存在しない「このDiscordサーバー固有のデータ」は `data/` フォルダ内のJSONファイルにbotが自前で保存します(gitには含まれません)。
+- 入室/退室(自主退出・キック・BANを判別)・メッセージ編集/削除・ボイスチャンネルの入退室/移動は、DiscordのGatewayイベントを直接購読して検知し、それぞれ`DISCORD_JOIN_LOG_CHANNEL_ID`/`DISCORD_LOG_CHANNEL_ID`に自動投稿します(ReinAI側のAPIは介しません)。
 
 すべてbot側からの発信(ポーリング/APIコール)のみで完結するため、bot側にWebhook受信用のURLやポート開放は一切不要です。
+
+## ブランディング
+
+このbotのアイコンは、ReinAI/REINChatと同じ「Rein」ファミリーのグラデーション吹き出しマークに統一しています。Discord Developer Portal の「Bot」タブ → アイコン画像で、リポジトリ同梱の `brand/rein-bot-avatar.png` をアップロードしてください(bot自身のトークンでのアバター変更はDiscord APIへの直接アクセスが必要なため、この操作は手動です)。
 
 ## 管理者コマンド一覧(「Rein管理者」ロール限定)
 
@@ -91,6 +100,18 @@ npm start                    # bot起動
 
 ### システム・ユーティリティ
 `/bot-stats` `/bot-restart` `/custom-command-add`(+ 誰でも使える`/custom`) `/broadcast-dm` `/db-health` `/dns-check` `/maintenance-on` `/maintenance-off`
+
+### ロール・招待管理
+`/role-add` `/role-remove` `/invite-list` `/invite-revoke`
+
+### ボイス管理
+`/voice-move` `/voice-disconnect` `/voice-mute-all` `/voice-lock`
+
+### モデレーションメモ
+`/note-add` `/note-list` `/note-delete` — ユーザーへの内部メモ。本人には一切通知されません。
+
+### リマインダー
+`/reminder-set` `/reminder-list` `/reminder-cancel` — 指定日時にチャンネルへ自動投稿(メンション任意)。
 
 ### 今回あえて実装しなかったもの
 

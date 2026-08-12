@@ -7,6 +7,8 @@ const REQUIRED = [
   "DISCORD_VERIFIED_ROLE_ID",
   "DISCORD_ANNOUNCEMENT_CHANNEL_ID",
   "DISCORD_ADMIN_ROLE_ID",
+  "DISCORD_JOIN_LOG_CHANNEL_ID",
+  "DISCORD_LOG_CHANNEL_ID",
   "REINAI_API_URL",
   "DISCORD_BOT_SECRET",
 ];
@@ -26,6 +28,8 @@ export const config = {
   verifiedRoleId: process.env.DISCORD_VERIFIED_ROLE_ID,
   announcementChannelId: process.env.DISCORD_ANNOUNCEMENT_CHANNEL_ID,
   adminRoleId: process.env.DISCORD_ADMIN_ROLE_ID,
+  joinLogChannelId: process.env.DISCORD_JOIN_LOG_CHANNEL_ID,
+  logChannelId: process.env.DISCORD_LOG_CHANNEL_ID,
   apiUrl: process.env.REINAI_API_URL.replace(/\/$/, ""),
   botSecret: process.env.DISCORD_BOT_SECRET,
   pollIntervalMs: Number(process.env.POLL_INTERVAL_MS ?? 15000),
