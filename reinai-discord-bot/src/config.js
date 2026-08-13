@@ -33,4 +33,9 @@ export const config = {
   apiUrl: process.env.REINAI_API_URL.replace(/\/$/, ""),
   botSecret: process.env.DISCORD_BOT_SECRET,
   pollIntervalMs: Number(process.env.POLL_INTERVAL_MS ?? 15000),
+  // Optional: enables /verify-reinchat (direct Discord <-> REINChat account
+  // linking, independent of the ReinAI-based /verify). Leave unset to skip
+  // that feature entirely rather than requiring every existing deployment
+  // to add it immediately.
+  reinchatUrl: process.env.REINCHAT_URL ? process.env.REINCHAT_URL.replace(/\/$/, "") : null,
 };

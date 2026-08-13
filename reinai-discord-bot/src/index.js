@@ -1,6 +1,7 @@
 import { Client, GatewayIntentBits, Events, Partials } from "discord.js";
 import { config } from "./config.js";
 import * as verify from "./commands/verify.js";
+import * as verifyReinChat from "./commands/verifyReinChat.js";
 import { commands as userManagementCommands } from "./commands/admin/userManagement.js";
 import { commands as moderationCommands } from "./commands/admin/moderation.js";
 import { commands as contentCommands } from "./commands/admin/content.js";
@@ -11,6 +12,7 @@ import { commands as noteCommands } from "./commands/admin/notes.js";
 import { commands as voiceCommands } from "./commands/admin/voice.js";
 import { commands as roleCommands } from "./commands/admin/roles.js";
 import { startVerificationPoller } from "./pollers/verification.js";
+import { startReinChatVerificationPoller } from "./pollers/reinchatVerification.js";
 import { startAnnouncementPoller } from "./pollers/announcements.js";
 import { startSchedulerPoller } from "./pollers/scheduler.js";
 import { registerSecretCheck } from "./events/secretCheck.js";
@@ -25,6 +27,7 @@ import { botStats } from "./stats.js";
 
 const allCommands = [
   verify,
+  verifyReinChat,
   ...userManagementCommands,
   ...moderationCommands,
   ...contentCommands,
@@ -55,6 +58,7 @@ const client = new Client({
 client.once(Events.ClientReady, (c) => {
   console.log(`[bot] logged in as ${c.user.tag}`);
   startVerificationPoller(client);
+  startReinChatVerificationPoller(client);
   startAnnouncementPoller(client);
   startSchedulerPoller(client);
   registerSecretCheck(client);

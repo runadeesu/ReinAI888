@@ -1,6 +1,7 @@
 import { REST, Routes } from "discord.js";
 import { config } from "./config.js";
 import * as verify from "./commands/verify.js";
+import * as verifyReinChat from "./commands/verifyReinChat.js";
 import { commands as userManagementCommands } from "./commands/admin/userManagement.js";
 import { commands as moderationCommands } from "./commands/admin/moderation.js";
 import { commands as contentCommands } from "./commands/admin/content.js";
@@ -13,6 +14,7 @@ import { commands as roleCommands } from "./commands/admin/roles.js";
 
 const allCommands = [
   verify,
+  verifyReinChat,
   ...userManagementCommands,
   ...moderationCommands,
   ...contentCommands,

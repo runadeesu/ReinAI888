@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const user = await resolveUserByQuery(query);
   if (!user) return NextResponse.json({ error: "ユーザーが見つかりません" }, { status: 404 });
 
-  const [conversationCount, messageStats, discordLink] = await Promise.all([
+  const [conversationCount, messageStats, discordLink, reinChatLink] = await Promise.all([
     prisma.conversation.count({ where: { userId: user.id } }),
     prisma.message.aggregate({
       where: { conversation: { userId: user.id } },
@@ -19,6 +19,7 @@ export async function GET(request: Request) {
       _count: { _all: true },
     }),
     prisma.discordLink.findUnique({ where: { userId: user.id } }),
+    prisma.reinChatLink.findUnique({ where: { userId: user.id } }),
   ]);
 
   return NextResponse.json({
@@ -34,5 +35,6 @@ export async function GET(request: Request) {
     messageCount: messageStats._count._all,
     totalTokens: (messageStats._sum.promptTokens ?? 0) + (messageStats._sum.completionTokens ?? 0),
     discordUsername: discordLink?.discordUsername ?? null,
+    reinChatDisplayId: reinChatLink?.reinchatDisplayId ?? null,
   });
 }

@@ -42,6 +42,7 @@ export const commands = [
           { name: "メール確認", value: r.emailVerified ? "済" : "未", inline: true },
           { name: "2段階認証", value: r.twoFactorEnabled ? "有効" : "無効", inline: true },
           { name: "Discord", value: r.discordUsername ? `@${r.discordUsername}` : "未連携", inline: true },
+          { name: "REINChat", value: r.reinChatDisplayId ? `@${r.reinChatDisplayId}` : "未連携", inline: true },
           { name: "会話数", value: String(r.conversationCount), inline: true },
           { name: "メッセージ数", value: String(r.messageCount), inline: true },
           { name: "総トークン数", value: r.totalTokens.toLocaleString(), inline: true }
