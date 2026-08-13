@@ -1,0 +1,8 @@
+# These are separate, independently-deployed projects living as
+# subdirectories of this repo — none of them belong in the reinai-app
+# Vercel deployment. reinai-code in particular ships large Electron build
+# artifacts (installers, unpacked release folders) that exceed Vercel's
+# per-file upload limit.
+reinai-code/
+reinai-admin/
+reinai-discord-bot/
